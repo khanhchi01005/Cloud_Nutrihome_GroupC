@@ -3,6 +3,36 @@ import plotly.express as px
 import plotly.graph_objects as go
 import json
 import requests
+from config import BACKEND_API
+
+FAKE_USER_CHART = {
+    "absorbed_carbs": 150,
+    "absorbed_protein": 90,
+    "absorbed_fat": 70,
+    "absorbed_calories": 1800,
+    "target_carbs": 250,
+    "target_protein": 120,
+    "target_fat": 80,
+    "target_calories": 2200,
+}
+
+FAKE_WEEKLY_MENU = {
+    "mon": {
+        "breakfast": [{"name": "Oatmeal", "image": "features_images/oatmeal.jpg", "recipe_id": "1"}],
+        "lunch": [{"name": "Salad", "image": "features_images/salad.jpg", "recipe_id": "2"}],
+        "dinner": [{"name": "Grilled Chicken", "image": "features_images/chicken.jpg", "recipe_id": "3"}],
+    },
+    "tue": {"breakfast": [], "lunch": [], "dinner": []},
+    "wed": {
+        "breakfast": [{"name": "Oatmeal", "image": "features_images/oatmeal.jpg", "recipe_id": "1"}],
+        "lunch": [{"name": "Salad", "image": "features_images/salad.jpg", "recipe_id": "2"}],
+        "dinner": [{"name": "Grilled Chicken", "image": "features_images/chicken.jpg", "recipe_id": "3"}],
+    },
+    "thu": {"breakfast": [], "lunch": [], "dinner": []},
+    "fri": {"breakfast": [], "lunch": [], "dinner": []},
+    "sat": {"breakfast": [], "lunch": [], "dinner": []},
+    "sun": {"breakfast": [], "lunch": [], "dinner": []},
+}
 
 # Đổi trạng thái khi nhấn nút
 def toggle_favorite():
@@ -149,49 +179,61 @@ def display_meal(meal, day):
 
 if st.session_state.logged_in:
 
-    #Chart
-    get_all_api = BACKEND_API + "/api/home/chart"
-    response = requests.get(
-        get_all_api,
-        data=json.dumps(
-            {
-                "user_id": st.session_state.user["id"]
-            }
-        ),
-        headers = {'Content-Type': 'application/json',}
-    )
-    print(response.status_code)
-    if response.status_code == 200:
-        st.session_state.user["absorbed_carbs"] = response.json()["data"]["chart"]["absorbedCarbs"]
-        st.session_state.user["absorbed_protein"] = response.json()["data"]["chart"]["absorbedProtein"]
-        st.session_state.user["absorbed_fat"] = response.json()["data"]["chart"]["absorbedFat"]
-        st.session_state.user["absorbed_calories"] = response.json()["data"]["chart"]["absorbedCalories"]
-        st.session_state.user["target_carbs"] = response.json()["data"]["chart"]["goalCarbs"]
-        st.session_state.user["target_protein"] = response.json()["data"]["chart"]["goalProtein"]
-        st.session_state.user["target_fat"] = response.json()["data"]["chart"]["goalFat"]
-        st.session_state.user["target_calories"] = response.json()["data"]["chart"]["goalCalories"]
+    if st.session_state.backend_connected:
+        # --- Gọi API thật ---
+        try:
+            get_all_api = BACKEND_API + "/api/home/chart"
+            response = requests.get(
+                get_all_api,
+                data=json.dumps({"user_id": st.session_state.user["id"]}),
+                headers={'Content-Type': 'application/json'}
+            )
+            if response.status_code == 200:
+                data = response.json()["data"]["chart"]
+                st.session_state.user["absorbed_carbs"] = data["absorbedCarbs"]
+                st.session_state.user["absorbed_protein"] = data["absorbedProtein"]
+                st.session_state.user["absorbed_fat"] = data["absorbedFat"]
+                st.session_state.user["absorbed_calories"] = data["absorbedCalories"]
+                st.session_state.user["target_carbs"] = data["goalCarbs"]
+                st.session_state.user["target_protein"] = data["goalProtein"]
+                st.session_state.user["target_fat"] = data["goalFat"]
+                st.session_state.user["target_calories"] = data["goalCalories"]
+            else:
+                raise Exception("Backend returned non-200")
+        except Exception as e:
+            st.warning(f"Backend error: {e}. Using fake data.")
+            st.session_state.user.update(FAKE_USER_CHART)
+    else:
+        # --- Dùng fake data ---
+        st.session_state.user.update(FAKE_USER_CHART)
 
-    #Weekly menu:
-    get_all_api = BACKEND_API + "/api/weekly_menu"
-    response = requests.get(
-        get_all_api,
-        data=json.dumps(
-            {
-                "user_id": st.session_state.user["id"]
-            }
-        ),
-        headers = {'Content-Type': 'application/json',}
-    )
-    print(response.status_code)
-    if response.status_code == 200:
-        date1 = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-        date2 = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
-        meal = ["Breakfast", "Lunch", "Dinner"]
-        for i, day in enumerate(date1):
-            for j, meal_type in enumerate(meal):
-                st.session_state.weekly_menu[day][meal_type]["listOfFoods"] = response.json()["data"]["menu"][date2[i]][meal_type.lower()]
-
-        
+    # --- Weekly menu ---
+    if st.session_state.backend_connected:
+        try:
+            get_all_api = BACKEND_API + "/api/weekly_menu"
+            response = requests.get(
+                get_all_api,
+                data=json.dumps({"user_id": st.session_state.user["id"]}),
+                headers={'Content-Type': 'application/json'}
+            )
+            if response.status_code == 200:
+                date1 = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+                date2 = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+                meal = ["Breakfast", "Lunch", "Dinner"]
+                for i, day in enumerate(date1):
+                    for j, meal_type in enumerate(meal):
+                        st.session_state.weekly_menu[day][meal_type]["listOfFoods"] = response.json()["data"]["menu"][date2[i]][meal_type.lower()]
+            else:
+                raise Exception("Backend returned non-200")
+        except Exception as e:
+            st.warning(f"Backend error: {e}. Using fake menu.")
+            st.session_state.weekly_menu["Monday"]["Breakfast"]["listOfFoods"] = FAKE_WEEKLY_MENU["mon"]["breakfast"]
+            st.session_state.weekly_menu["Monday"]["Lunch"]["listOfFoods"] = FAKE_WEEKLY_MENU["mon"]["lunch"]
+            st.session_state.weekly_menu["Monday"]["Dinner"]["listOfFoods"] = FAKE_WEEKLY_MENU["mon"]["dinner"]
+    else:
+        st.session_state.weekly_menu["Wednesday"]["Breakfast"]["listOfFoods"] = FAKE_WEEKLY_MENU["mon"]["breakfast"]
+        st.session_state.weekly_menu["Wednesday"]["Lunch"]["listOfFoods"] = FAKE_WEEKLY_MENU["mon"]["lunch"]
+        st.session_state.weekly_menu["Wednesday"]["Dinner"]["listOfFoods"] = FAKE_WEEKLY_MENU["mon"]["dinner"]       
 
     st.title(f"Chào mừng {st.session_state.user["fullname"]}! Hôm nay bạn muốn ăn gì?")
     st.text("")
