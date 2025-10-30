@@ -53,3 +53,31 @@ def show_personal_detail():
         }), 200, {'Content-Type': 'application/json'}
     else:
         return jsonify({'status': 'error', 'message': 'Unavailable user'}), 404
+
+#Update personal detail
+def update_personal_detail():
+        data = request.json 
+        user_id = data.get('user_id')
+        height = data.get('height')
+        weight = data.get('weight')
+        activity_level = data.get('activity_level')
+        dob = data.get('dob')
+        disease = data.get('disease')
+        allergen = data.get('allergen')
+        fullname = data.get('fullname')
+        conn = get_db_connection()
+        person = conn.execute("SELECT user_id FROM eating_histories WHERE user_id = ?", (user_id,)).fetchone()
+        conn.close()
+        
+        if person:
+            conn = get_db_connection()
+            conn.execute("""
+            UPDATE users SET height = ?, weight = ?, activity_level = ?, disease = ?, dob = ?, allergen = ?, fullname = ?
+            WHERE user_id = ?
+            """, (height,weight,activity_level,user_id,disease,dob,allergen, fullname))
+            conn.commit()
+            conn.close()
+            return jsonify({'status': 'success', 'message': 'Updated personal detail scuccessfully'}), 200 
+        
+        else:
+            return jsonify({'status': 'error', 'message': 'Failed to update personal detail'}), 404
