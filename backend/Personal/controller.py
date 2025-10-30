@@ -13,3 +13,7 @@ def show_detail():
 @personal.route("/api/personal/update", methods = ['PATCH'])
 def update_detail():
     return update_personal_detail()
+
+@personal.route("/api/personal/history",methods =['GET'])
+def show_nutrition_history():
+    return show_history()

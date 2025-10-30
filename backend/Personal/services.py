@@ -81,3 +81,60 @@ def update_personal_detail():
         
         else:
             return jsonify({'status': 'error', 'message': 'Failed to update personal detail'}), 404
+
+# Show nutrition history within 3 days
+def show_history():
+    data = request.json 
+    user_id = data.get('user_id')
+    conn = get_db_connection()
+
+    user = conn.execute('SELECT user_id FROM eating_histories WHERE user_id = ?', (user_id,)).fetchone()
+    conn.close()
+
+    if user:
+        conn = get_db_connection()
+        nutrition_data = conn.execute(
+            '''
+            SELECT
+                day,
+                meal,
+                GROUP_CONCAT(recipes.name, ',') AS recipes,
+                SUM(carbs) AS carbs,
+                SUM(protein) AS protein,
+                SUM(fat) AS fat,
+                SUM(calories) AS calories
+            FROM eating_histories 
+            JOIN recipes 
+            ON eating_histories.recipe_id = recipes.recipe_id
+            WHERE user_id = ? 
+                AND day BETWEEN date('now', '-2 days') AND date('now')  -- Past 3 days, including today
+            GROUP BY day, meal;
+            ''', (user_id,)
+        ).fetchall()
+        conn.close()
+
+        result = {}
+
+        for row in nutrition_data:
+            day = row['day']
+            
+            # Initialize the day if not already in result
+            if day not in result:
+                result[day] = {
+                    "meals": {},
+                    "carbs": 0,
+                    "fat": 0,
+                    "protein": 0,
+                    "calories": 0
+                }
+            
+            result[day]["meals"][row['meal']] = row['recipes'].split(',') if row['recipes'] else []
+            result[day]["carbs"] += row['carbs'] or 0
+            result[day]["fat"] += row['fat'] or 0
+            result[day]["protein"] += row['protein'] or 0
+            result[day]["calories"] += row['calories'] or 0
+
+        # Directly return the result dictionary instead of a list
+        return jsonify({'status': 'success', 'data': result}), 200, {'Content-Type': 'application/json'}
+
+    return jsonify({'status': 'error', 'message': 'User not found'}), 404
