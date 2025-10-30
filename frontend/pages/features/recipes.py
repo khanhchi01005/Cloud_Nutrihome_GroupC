@@ -23,8 +23,8 @@ def details(id):
     response = requests.get(get_all_api, data=json.dumps({"recipe_id": id}), headers = {
         'Content-Type': 'application/json',
     })
-    print(response.status_code)
-    print(response.json())
+    # print(response.status_code)
+    # print(response.json())
 
     st.session_state.food_details =  response.json()["data"]
 
