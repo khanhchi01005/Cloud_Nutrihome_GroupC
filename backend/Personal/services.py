@@ -138,3 +138,77 @@ def show_history():
         return jsonify({'status': 'success', 'data': result}), 200, {'Content-Type': 'application/json'}
 
     return jsonify({'status': 'error', 'message': 'User not found'}), 404
+
+
+#Show today's nutrition history 
+def show_nutrition_today():
+    data = request.json 
+    user_id = data.get('user_id')
+    conn = get_db_connection()
+    
+    user = conn.execute('SELECT user_id FROM eating_histories WHERE user_id = ?', (user_id,)).fetchone()
+    conn.close()
+    
+    if user:
+        conn = get_db_connection()
+        each_meal_data = conn.execute(
+            '''
+            SELECT 
+                meal, 
+                SUM(carbs) AS "carbs",
+                SUM(protein) AS "protein",
+                SUM(fat) AS "fat",
+                SUM(calories) AS "calories"
+            FROM eating_histories 
+            JOIN recipes 
+            ON eating_histories.recipe_id = recipes.recipe_id
+            WHERE user_id = ? AND day = date('now') AND eaten = 1
+            GROUP BY meal
+            ''', (user_id,)
+        ).fetchall()  
+        
+        total_meal_data = conn.execute(
+            '''
+            SELECT  
+                SUM(carbs) AS "carbs",
+                SUM(protein) AS "protein",
+                SUM(fat) AS "fat",
+                SUM(calories) AS "calories"
+            FROM eating_histories 
+            JOIN recipes 
+            ON eating_histories.recipe_id = recipes.recipe_id
+            WHERE user_id = ? AND day = date('now') AND eaten = 1
+            GROUP BY day
+            ''', (user_id,)
+        ).fetchone()  
+        
+        conn.close()
+        
+        meals = {}
+        for row in each_meal_data:
+            meal = row['meal']
+            meals[meal] = {
+                "carbs": str(row['carbs'] or 0),
+                "protein": str(row['protein'] or 0),
+                "fat": str(row['fat'] or 0)
+            }
+        
+        total_nutrients = {
+            "carbs": str(total_meal_data['carbs'] or 0),
+            "protein": str(total_meal_data['protein'] or 0),
+            "fat": str(total_meal_data['fat'] or 0)
+        }
+        
+        final_result = {
+            "status": "success",
+            "data": {
+                "breakfast": meals.get("breakfast", {"carbs": "0", "protein": "0", "fat": "0"}),
+                "lunch": meals.get("lunch", {"carbs": "0", "protein": "0", "fat": "0"}),
+                "dinner": meals.get("dinner", {"carbs": "0", "protein": "0", "fat": "0"}),
+                "total_nutrients": total_nutrients
+            }
+        }
+        
+        return jsonify(final_result), 200, {'Content-Type': 'application/json'}
+
+    return jsonify({'status': 'error', 'message': 'User not found'}), 404
