@@ -48,3 +48,28 @@ def create_family_service(family_name, user_id, image, description):
         }
     finally:
         conn.close()
+
+
+def validate_member_service(invitee_username):
+    conn = get_db_connection()
+    invitee = conn.execute("""
+        SELECT username, fullname AS name, avatar AS profile_image 
+        FROM users WHERE username = ?
+    """, (invitee_username,)).fetchone()
+    conn.close()
+
+    if invitee:
+        return {
+            'status': 'success',
+            'waiting_list': {
+                'username': invitee['username'],
+                'name': invitee['name'],
+                'profile_image': invitee['profile_image']
+            }
+        }
+    else:
+        return {
+            'status': 'error',
+            'message': 'User not found'
+        }
+
