@@ -22,3 +22,13 @@ def create_family():
     description = data.get('description')
     result = create_family_service(family_name, user_id, image, description)
     return jsonify(result)
+
+
+# API Xác thực thành viên trước khi thêm vào gia đình
+@family_bp.route('/family/health/add-member/validate', methods=['POST'])
+def validate_member():
+    data = request.get_json()
+    invitee_username = data.get('invitee_username')
+    
+    result = validate_member_service(invitee_username)
+    return jsonify(result)
