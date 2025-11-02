@@ -1,0 +1,4 @@
+# Bỏ qua file biên dịch Python
+__pycache__/
+*.py[cod]
+*$py.class
