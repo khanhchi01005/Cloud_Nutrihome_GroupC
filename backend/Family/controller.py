@@ -32,3 +32,13 @@ def validate_member():
     
     result = validate_member_service(invitee_username)
     return jsonify(result)
+
+# API Thêm tất cả thành viên từ danh sách chờ vào gia đình
+@family_bp.route('/family/health/add-member/add-all', methods=['POST'])
+def add_all_members():
+    data = request.get_json()
+    family_id = data.get('family_id')
+    usernames = data.get('usernames')
+    
+    result = add_all_members_service(family_id, usernames)
+    return jsonify(result)

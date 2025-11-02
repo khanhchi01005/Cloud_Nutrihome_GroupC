@@ -73,3 +73,79 @@ def validate_member_service(invitee_username):
             'message': 'User not found'
         }
 
+
+
+def add_all_members_service(family_id, usernames):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    for username in usernames:
+        cursor.execute("""
+            UPDATE users SET family_id = ? WHERE username = ?
+        """, (family_id, username))
+    conn.commit()
+    conn.close()
+
+    return {
+        'status': 'success',
+        'message': 'All users successfully added to the family',
+        'added_members': usernames
+    }
+
+def get_family_health_list_service(family_id):
+    if not family_id:
+        return {"status": "error", "message": "family_id is required"}
+    
+    conn = get_db_connection()
+    family_members = conn.execute("""
+        SELECT 
+            fullname AS name, 
+            username, 
+            avatar AS profile_image, 
+            user_id AS user_id, 
+            target_carbs as targetCarbs, 
+            target_fat as targetFat, 
+            target_protein as targetProtein, 
+            target_calories as targetCalo
+        FROM users 
+        WHERE family_id = ?
+    """, (family_id,)).fetchall()
+    conn.close()
+
+    if not family_members:
+        return {"status": "error", "message": "No family members found"}
+
+    members_list = []
+    totalCurrentCarbs = 0
+    totalCurrentFat = 0
+    totalCurrentProtein = 0
+    for member in family_members:
+        nutrition_data = calculate_nutrition_for_user(member["user_id"])
+
+         # Tính tổng giá trị dinh dưỡng hiện tại của cả nhà
+        totalCurrentCarbs += nutrition_data["currentCarbs"]
+        totalCurrentFat += nutrition_data["currentFat"]
+        totalCurrentProtein += nutrition_data["currentProtein"]
+        
+        members_list.append({
+            "name": member["name"],
+            "username": member["username"],
+            "profile_image": member["profile_image"],
+            "user_id": member["user_id"],
+            "currentCarbs": nutrition_data["currentCarbs"],
+            "targetCarbs": member["targetCarbs"],
+            "currentFat": nutrition_data["currentFat"],
+            "targetFat": member["targetFat"],
+            "currentProtein": nutrition_data["currentProtein"],
+            "targetProtein": member["targetProtein"],
+            "currentCalo": nutrition_data["currentCalo"],
+            "targetCalo": member["targetCalo"]
+        })
+
+    return {
+        "status": "success",
+        "family_members": members_list,
+        # Thêm các giá trị tổng dinh dưỡng hiện tại của cả gia đình để sử dụng cho phần biểu đồ missing
+        "totalCurrentCarbs": totalCurrentCarbs,
+        "totalCurrentFat": totalCurrentFat,
+        "totalCurrentProtein": totalCurrentProtein
+    }
