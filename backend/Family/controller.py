@@ -60,3 +60,27 @@ def get_family_detail():
     
     result = get_family_detail1(family_id)
     return jsonify(result)
+
+# API Lấy dữ liệu thiếu hụt chất dinh dưỡng của gia đình
+@family_bp.route('/family/health/missing_nutrient', methods=['GET'])
+def get_family_missing_nutrient():
+    data = request.get_json()
+    family_id = data.get('family_id')
+    
+    if not family_id:
+        return jsonify({"status": "error", "message": "family_id is required"}), 400
+
+    result = get_family_missing_nutrient_service(family_id)
+    return jsonify(result)
+
+# API Đề xuất danh sách mua sắm cho gia đình
+@family_bp.route('/family/shopping-list', methods=['GET'])
+def get_shopping_list():
+    data = request.get_json()
+    family_id = data.get('family_id')
+
+    if not family_id:
+        return jsonify({'status': 'error', 'message': 'family_id and day are required'}), 400
+
+    result = get_shopping_list_service(family_id)
+    return jsonify(result)
