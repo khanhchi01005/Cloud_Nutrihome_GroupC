@@ -149,3 +149,102 @@ def get_family_health_list_service(family_id):
         "totalCurrentFat": totalCurrentFat,
         "totalCurrentProtein": totalCurrentProtein
     }
+
+def get_family_health_list_service(family_id):
+    if not family_id:
+        return {"status": "error", "message": "family_id is required"}
+    
+    conn = get_db_connection()
+    family_members = conn.execute("""
+        SELECT 
+            fullname AS name, 
+            username, 
+            avatar AS profile_image, 
+            user_id AS user_id, 
+            target_carbs as targetCarbs, 
+            target_fat as targetFat, 
+            target_protein as targetProtein, 
+            target_calories as targetCalo
+        FROM users 
+        WHERE family_id = ?
+    """, (family_id,)).fetchall()
+    conn.close()
+
+    if not family_members:
+        return {"status": "error", "message": "No family members found"}
+
+    members_list = []
+    totalCurrentCarbs = 0
+    totalCurrentFat = 0
+    totalCurrentProtein = 0
+    for member in family_members:
+        nutrition_data = calculate_nutrition_for_user(member["user_id"])
+
+         # Tính tổng giá trị dinh dưỡng hiện tại của cả nhà
+        totalCurrentCarbs += nutrition_data["currentCarbs"]
+        totalCurrentFat += nutrition_data["currentFat"]
+        totalCurrentProtein += nutrition_data["currentProtein"]
+        
+        members_list.append({
+            "name": member["name"],
+            "username": member["username"],
+            "profile_image": member["profile_image"],
+            "user_id": member["user_id"],
+            "currentCarbs": nutrition_data["currentCarbs"],
+            "targetCarbs": member["targetCarbs"],
+            "currentFat": nutrition_data["currentFat"],
+            "targetFat": member["targetFat"],
+            "currentProtein": nutrition_data["currentProtein"],
+            "targetProtein": member["targetProtein"],
+            "currentCalo": nutrition_data["currentCalo"],
+            "targetCalo": member["targetCalo"]
+        })
+
+    return {
+        "status": "success",
+        "family_members": members_list,
+        # Thêm các giá trị tổng dinh dưỡng hiện tại của cả gia đình để sử dụng cho phần biểu đồ missing
+        "totalCurrentCarbs": totalCurrentCarbs,
+        "totalCurrentFat": totalCurrentFat,
+        "totalCurrentProtein": totalCurrentProtein
+    }
+
+def get_family_missing_nutrient_service(family_id):
+    # Lấy dữ liệu dinh dưỡng hiện tại của cả gia đình
+    family_data = get_family_health_list_service(family_id)
+    
+    if family_data["status"] != "success":
+        return {"status": "error", "message": "Unable to retrieve family data"}
+
+    # Tổng hợp target của cả gia đình
+    conn = get_db_connection()
+    family_targets = conn.execute("""
+        SELECT 
+            SUM(target_carbs) AS totalTargetCarbs,
+            SUM(target_fat) AS totalTargetFat,
+            SUM(target_protein) AS totalTargetProtein
+        FROM users
+        WHERE family_id = ?
+    """, (family_id,)).fetchone()
+    conn.close()
+
+    # Tính toán missing dinh dưỡng
+    totalCurrentCarbs = family_data["totalCurrentCarbs"]
+    totalCurrentFat = family_data["totalCurrentFat"]
+    totalCurrentProtein = family_data["totalCurrentProtein"]
+
+    missingCarbs = family_targets["totalTargetCarbs"] - totalCurrentCarbs
+    missingFat = family_targets["totalTargetFat"] - totalCurrentFat
+    missingProtein = family_targets["totalTargetProtein"] - totalCurrentProtein
+
+    return {
+        "status": "success",
+        "missing_nutrition": {
+            "missingCarbs": missingCarbs,
+            "currentCarbs": totalCurrentCarbs,
+            "missingFat": missingFat,
+            "currentFat": totalCurrentFat,
+            "missingProtein": missingProtein,
+            "currentProtein": totalCurrentProtein
+        }
+    }

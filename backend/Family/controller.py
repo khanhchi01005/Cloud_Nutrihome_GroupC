@@ -42,3 +42,21 @@ def add_all_members():
     
     result = add_all_members_service(family_id, usernames)
     return jsonify(result)
+
+# API Lấy danh sách thành viên trong gia đình và dữ liệu cho biểu đồ dinh dưỡng từng thành viên
+@family_bp.route('/family/health/list', methods=['GET'])
+def get_family_health_list():
+    data = request.get_json()  
+    family_id = data.get('family_id')  
+    
+    result = get_family_health_list_service(family_id)
+    return jsonify(result)
+
+# API lấy thông tin family
+@family_bp.route('/family/detail', methods=['GET'])
+def get_family_detail():
+    data = request.get_json()  
+    family_id = data.get('family_id')  
+    
+    result = get_family_detail1(family_id)
+    return jsonify(result)
