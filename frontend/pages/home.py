@@ -46,7 +46,6 @@ def details(id):
         'Content-Type': 'application/json',
     })
     print(response.status_code)
-    print(response.json())
 
     st.session_state.food_details =  response.json()["data"]
 
@@ -216,6 +215,7 @@ if st.session_state.logged_in:
                 data=json.dumps({"user_id": st.session_state.user["id"]}),
                 headers={'Content-Type': 'application/json'}
             )
+
             if response.status_code == 200:
                 date1 = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
                 date2 = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
@@ -266,6 +266,53 @@ if st.session_state.logged_in:
         col2.plotly_chart(pie_carbs, use_container_width=True)
         col3.plotly_chart(pie_fat, use_container_width=True)
         col4.plotly_chart(pie_protein, use_container_width=True)
+
+    with st.container(border=True):
+        st.write("Bạn muốn NutriHome gợi ý thực đơn cho cả tuần cho gia đình bạn dựa trên khẩu phần và thói quen dinh dưỡng của từng thành viên?")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            suggest_family_menu_button = st.button("👨‍👩‍👧‍👦 Gợi ý thực đơn gia đình trong tuần", use_container_width=True, type="primary")
+
+        with col2:
+            reset_menu_button = st.button("🧹 Xoá thực đơn trong tuần", use_container_width=True)
+
+        # Nút gợi ý thực đơn gia đình
+        if suggest_family_menu_button:
+            try:
+                generate_api = BACKEND_API + "/generate-family-meal"
+                response = requests.post(
+                    generate_api,
+                    json={"family_id": st.session_state.user["family_id"]},  # dùng family_id thay vì user_id
+                    headers={"Content-Type": "application/json"}
+                )
+
+                if response.status_code == 200:
+                    st.success("🎉 Thực đơn gia đình trong tuần đã được AI gợi ý thành công!")
+                    st.info("Hãy mở lại mục *Thực đơn trong tuần* để xem kết quả mới.")
+                else:
+                    st.error(f"Lỗi khi gọi API: {response.status_code} - {response.text}")
+            except Exception as e:
+                st.error(f"Lỗi kết nối tới backend: {e}")
+
+        # Nút xoá thực đơn
+        if reset_menu_button:
+            try:
+                reset_api = BACKEND_API + "/reset-family-meal"
+                response = requests.post(
+                    reset_api,
+                    json={"family_id": st.session_state.user["family_id"]},
+                    headers={"Content-Type": "application/json"}
+                )
+
+                if response.status_code == 200:
+                    msg = response.json().get("message", "Đã xoá thực đơn trong tuần.")
+                    st.success(f"✅ {msg}")
+                else:
+                    st.error(f"Lỗi khi gọi API xoá thực đơn: {response.status_code} - {response.text}")
+            except Exception as e:
+                st.error(f"Lỗi kết nối tới backend khi xoá thực đơn: {e}")
 
     st.text("")
     st.text("")

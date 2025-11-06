@@ -25,28 +25,29 @@ with col1:
             st.image(image, use_container_width=True)
 
         if st.button("Quét nguyên liệu", type='primary', use_container_width=True):
-            if uploaded_image is not None:
-                is_dir = os.path.join("images/ingredient_safety", st.session_state.user["username"])
-                os.makedirs(is_dir, exist_ok=True)  # Creates folder if it doesn't exist            
-                # Save avatar in the user directory
-                avatar_path = os.path.join(is_dir, "ingredients.jpg")
-                avatar_image = Image.open(uploaded_image)
-                avatar_image.convert("RGB").save(avatar_path, "JPEG")
+            if uploaded_image is None:
+                st.warning("Vui lòng tải lên ảnh danh sách nguyên liệu trước.")
+                st.stop()
 
             get_all_api = BACKEND_API + "/api/ingredient_safety"
-            response = requests.post(
-                    get_all_api,
-                    data=json.dumps(
-                        {
-                            "user_id": f"{st.session_state.user["id"]}",
-                            "image_path": f"C:/Users/Admin/Desktop/NutriHome/frontend/images/ingredient_safety/{st.session_state.user["username"]}/ingredients.jpg"
-                        }
-                    ),
-                    headers = {'Content-Type': 'application/json',}
-                )
-            print(response.status_code)
+
+            # Gửi file ảnh thật + user_id
+            files = {
+                "file": (uploaded_image.name, uploaded_image.getvalue(), uploaded_image.type)
+            }
+            data = {
+                "user_id": str(st.session_state.user["id"])
+            }
+
+            response = requests.post(get_all_api, data=data, files=files)
+
             if response.status_code == 200:
                 st.session_state.Allergen = response.json()
+                st.success("✅ Quét nguyên liệu thành công!")
+                st.rerun()
+            else:
+                st.error(f"❌ Lỗi tải nguyên liệu: {response.status_code}")
+
             st.rerun()
 
 with col2:

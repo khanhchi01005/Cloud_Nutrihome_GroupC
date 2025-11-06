@@ -16,7 +16,7 @@ initialize_session()
 # --------------------------------------------------
 if "backend_connected" not in st.session_state:
     try:
-        response = requests.get(f"{BACKEND_API}/health", timeout=3)
+        response = requests.get(f"{BACKEND_API}/ping", timeout=3)
         if response.status_code == 200:
             st.session_state.backend_connected = True
         else:
@@ -25,9 +25,7 @@ if "backend_connected" not in st.session_state:
         st.session_state.backend_connected = False
 
 # Hiển thị trạng thái kết nối
-if st.session_state.backend_connected:
-    st.success("🟢 Backend connected")
-else:
+if not st.session_state.backend_connected:
     st.error("🔴 Backend not reachable")
 
 # --------------------------------------------------

@@ -52,7 +52,6 @@ def details(id):
         'Content-Type': 'application/json',
     })
     print(response.status_code)
-    print(response.json())
 
     st.session_state.food_details =  response.json()["data"]
 
@@ -153,30 +152,32 @@ def billScanning(day, meal_type):
     if uploaded_image is not None:
         image = Image.open(uploaded_image).convert("RGB")
         st.image(image, use_container_width=True)
+
     if st.button("Quét hóa đơn", type='primary', use_container_width=True):
-        bill_dir = os.path.join("images/bills", st.session_state.user["username"])
-        os.makedirs(bill_dir, exist_ok=True)  # Creates folder if it doesn't exist
-                    
-        # Save avatar in the user directory
-        avatar_path = os.path.join(bill_dir, "bill.jpg")
-        avatar_image = Image.open(uploaded_image)
-        avatar_image.convert("RGB").save(avatar_path, "JPEG")
+        if uploaded_image is None:
+            st.warning("Vui lòng tải lên ảnh hóa đơn trước.")
+            return
+
         get_all_api = BACKEND_API + "/api/weekly_menu/upload"
-        response = requests.post(
-                get_all_api,
-                data=json.dumps(
-                    {
-                        "user_id": f"{st.session_state.user["id"]}",
-                        "image_path" :f"C:/Users/Admin/Desktop/NutriHome/frontend/images/bills/{st.session_state.user["username"]}/bill.jpg",
-                        "meal": meal_type.lower()
-                    }
-                ),
-                headers = {'Content-Type': 'application/json',}
-            )
-        print(response.status_code)
+
+        # Gửi file ảnh + thông tin người dùng
+        files = {
+            "file": (uploaded_image.name, uploaded_image.getvalue(), uploaded_image.type)
+        }
+        data = {
+            "user_id": str(st.session_state.user["id"]),
+            "meal": meal_type.lower(),
+        }
+
+        response = requests.post(get_all_api, data=data, files=files)
+
         if response.status_code == 200:
-            st.session_state.weekly_menu[day][meal_type]["listOfFoods"].extend(response.json()["listOfFood"])
-        st.rerun()
+            result = response.json()
+            st.session_state.weekly_menu[day][meal_type]["listOfFoods"].extend(result["listOfFood"])
+            st.success("Đã quét hóa đơn thành công!")
+            st.rerun()
+        else:
+            st.error(f"Lỗi tải hóa đơn: {response.status_code}")
 
 # Hàm để hiển thị biểu đồ tròn và chi tiết dinh dưỡng
 def display_nutrition_chart():

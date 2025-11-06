@@ -235,7 +235,6 @@ if st.session_state.isSearch:
         'Content-Type': 'application/json',
     })
     print(response.status_code)
-    print(response.json())
 
     st.session_state.searchingList =  response.json()
     food_brief()
@@ -244,7 +243,6 @@ else:
     get_all_api = BACKEND_API + "/api/recipes"
     response = requests.get(get_all_api)
     print(response.status_code)
-    print(response.json())
 
     st.session_state.searchingList =  response.json()['data']
     

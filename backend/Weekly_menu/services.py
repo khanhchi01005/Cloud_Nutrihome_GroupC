@@ -193,3 +193,35 @@ def check_eaten():
         
         else:
             return jsonify({'status': 'error', 'message': 'Failed to update personal detail'}), 404
+
+def reset_weekly_menu_service(user_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    start_of_week = get_start_of_week()
+    end_of_week = start_of_week + timedelta(days=6)
+
+    try:
+        cursor.execute("""
+            DELETE FROM eating_histories
+            WHERE user_id = ? 
+              AND eaten = 0
+              AND day BETWEEN ? AND ?
+        """, (user_id, start_of_week.strftime('%Y-%m-%d'), end_of_week.strftime('%Y-%m-%d')))
+
+        conn.commit()
+        deleted_count = cursor.rowcount
+        conn.close()
+
+        return {
+            'status': 'success',
+            'message': f'Đã xoá {deleted_count} mục trong thực đơn tuần này (eaten = 0).'
+        }, 200
+
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return {
+            'status': 'error',
+            'message': f'Lỗi khi xoá dữ liệu: {str(e)}'
+        }, 500

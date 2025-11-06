@@ -16,10 +16,7 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def upload_label(data):
-    user_id = data.get('user_id')
-    image_path = data.get('image_path')
-    
+def upload_label(file_path, user_id):
     conn = get_db_connection()
     allergen = conn.execute(
     '''SELECT allergen
@@ -33,7 +30,7 @@ def upload_label(data):
     
     reader = easyocr.Reader(['vi'])
 
-    results = reader.readtext(image_path, detail=0)
+    results = reader.readtext(file_path, detail=0)
 
     all_text = ''
     for idx, text in enumerate(results, 1):
