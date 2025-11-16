@@ -3,8 +3,7 @@ from .services import login_user, register_user
 
 auth_bp = Blueprint('credentials', __name__)
 
-# API for logging in
-@auth_bp.route('/api/credentials/login', methods=['POST'])
+@auth_bp.route('/login', methods=['POST'])
 def login():
     data = request.json
     username = data.get('username')
@@ -28,7 +27,7 @@ def login():
         return jsonify({'status': 'error', 'message': 'Invalid username or password'}), 401
     
 # API for registering
-@auth_bp.route('/api/credentials/register', methods=['POST'])
+@auth_bp.route('/register', methods=['POST'])
 def register():
     data = request.json
     fullname = data.get('fullname')

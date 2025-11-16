@@ -1,16 +1,8 @@
 from datetime import datetime
-import sqlite3
 import json
 import os
 from flask import jsonify
-
-# Connect to the SQLite database
-DATABASE = os.path.join(os.path.dirname(os.getcwd()), 'nutrihome.db')
-
-def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+from db import get_db_connection
 
 def create_family_service(family_name, user_id, image, description):
     conn = get_db_connection()

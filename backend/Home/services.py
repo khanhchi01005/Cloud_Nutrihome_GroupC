@@ -1,13 +1,6 @@
 from datetime import datetime
-import sqlite3
 import os
-# Connect to the SQLite database
-DATABASE = os.path.join(os.path.dirname(os.getcwd()), 'nutrihome.db')
-
-def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+from db import get_db_connection
 
 # Hàm tính các chỉ số dinh dưỡng hiện tại cho mỗi thành viên trong ngày hiện tại
 def calculate_nutrition_for_user(user_id):

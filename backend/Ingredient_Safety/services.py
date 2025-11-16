@@ -1,5 +1,4 @@
 from flask import Flask, request, jsonify
-import sqlite3
 import datetime
 import json 
 import logging
@@ -8,13 +7,7 @@ import os
 import json
 from dotenv import load_dotenv
 import requests
-
-
-DATABASE = os.path.join(os.path.dirname(os.getcwd()), 'nutrihome.db')
-def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+from db import get_db_connection
 
 def upload_label(data):
     user_id = data.get('user_id')

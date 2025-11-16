@@ -1,13 +1,6 @@
-import sqlite3
 import datetime
 import os
-
-DATABASE = os.path.join(os.path.dirname(os.getcwd()), 'nutrihome.db')
-
-def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+from db import get_db_connection
 
 def login_user(username, password):
     conn = None
@@ -47,8 +40,9 @@ def register_user(fullname, username, password, dob, height, weight, activity_le
         target_calories = 0
         family_id = None
 
-        # Thêm người dùng mới
-        conn.execute(
+        # Thêm người dùng mới (dùng cursor để lấy lastrowid sau khi insert)
+        cursor = conn.cursor()
+        cursor.execute(
             """
             INSERT INTO users (
                 fullname, username, password, dob, height, weight, bmi,
@@ -64,8 +58,7 @@ def register_user(fullname, username, password, dob, height, weight, activity_le
         )
         conn.commit()
 
-
-        user_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        user_id = cursor.lastrowid
 
         # Tính tuổi người dùng
         age = datetime.datetime.now().year - datetime.datetime.strptime(dob, "%Y-%m-%d").year
@@ -80,7 +73,7 @@ def register_user(fullname, username, password, dob, height, weight, activity_le
                 }
             }
         }
-    except sqlite3.OperationalError as e:
+    except Exception as e:
         return {'status': 'fail', 'message': str(e)}
     finally:
         if conn:

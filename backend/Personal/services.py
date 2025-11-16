@@ -1,18 +1,14 @@
 from flask import Flask, request, jsonify
-import sqlite3
 import datetime
 import json 
 import logging
 import os
+from db import get_db_connection
 
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
 
-DATABASE = os.path.join(os.path.dirname(os.getcwd()), 'nutrihome.db')
-def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+# Using MySQL via `backend/db.py` get_db_connection()
 
 #Show personal detail 
 def show_personal_detail():
@@ -55,32 +51,47 @@ def show_personal_detail():
         return jsonify({'status': 'error', 'message': 'Unavailable user'}), 404
 
 #Update personal detail
+import json
+from flask import request, jsonify
+
 def update_personal_detail():
-        data = request.json 
-        user_id = data.get('user_id')
-        height = data.get('height')
-        weight = data.get('weight')
-        activity_level = data.get('activity_level')
-        dob = data.get('dob')
-        disease = data.get('disease')
-        allergen = data.get('allergen')
-        fullname = data.get('fullname')
-        conn = get_db_connection()
-        person = conn.execute("SELECT user_id FROM eating_histories WHERE user_id = ?", (user_id,)).fetchone()
+    data = request.json
+    user_id = data.get('user_id')
+
+    if not user_id:
+        return jsonify({'status': 'fail', 'message': 'user_id is required'}), 400
+
+    conn = get_db_connection()
+    person = conn.execute(
+        "SELECT user_id FROM users WHERE user_id = ?", (user_id,)
+    ).fetchone()
+
+    if not person:
         conn.close()
-        
-        if person:
-            conn = get_db_connection()
-            conn.execute("""
-            UPDATE users SET height = ?, weight = ?, activity_level = ?, disease = ?, dob = ?, allergen = ?, fullname = ?
-            WHERE user_id = ?
-            """, (height,weight,activity_level,user_id,disease,dob,allergen, fullname))
-            conn.commit()
-            conn.close()
-            return jsonify({'status': 'success', 'message': 'Updated personal detail scuccessfully'}), 200 
-        
-        else:
-            return jsonify({'status': 'error', 'message': 'Failed to update personal detail'}), 404
+        return jsonify({'status': 'fail', 'message': 'User not found'}), 404
+
+    # Lấy các field có dữ liệu để update
+    fields_to_update = {}
+    for field in ['height', 'weight', 'activity_level', 'disease', 'dob', 'allergen', 'fullname']:
+        value = data.get(field)
+        if value is not None:
+            # Nếu disease hoặc allergen là list, convert sang JSON string
+            if field in ['disease', 'allergen'] and isinstance(value, list):
+                value = json.dumps(value)
+            fields_to_update[field] = value
+
+    if fields_to_update:
+        # Tạo câu SQL động chỉ update những field có dữ liệu
+        set_clause = ', '.join(f"{key} = ?" for key in fields_to_update)
+        params = list(fields_to_update.values())
+        params.append(user_id)  # cho WHERE user_id = ?
+
+        conn.execute(f"UPDATE users SET {set_clause} WHERE user_id = ?", params)
+        conn.commit()
+
+    conn.close()
+    return jsonify({'status': 'success', 'message': 'Updated personal detail successfully'}), 200
+
 
 # Show nutrition history within 3 days
 def show_history():
@@ -107,7 +118,7 @@ def show_history():
             JOIN recipes 
             ON eating_histories.recipe_id = recipes.recipe_id
             WHERE user_id = ? 
-                AND day BETWEEN date('now', '-2 days') AND date('now')  -- Past 3 days, including today
+                    AND day BETWEEN DATE_SUB(CURDATE(), INTERVAL 2 DAY) AND CURDATE()  -- Past 3 days, including today
             GROUP BY day, meal;
             ''', (user_id,)
         ).fetchall()
@@ -162,7 +173,7 @@ def show_nutrition_today():
             FROM eating_histories 
             JOIN recipes 
             ON eating_histories.recipe_id = recipes.recipe_id
-            WHERE user_id = ? AND day = date('now') AND eaten = 1
+                WHERE user_id = ? AND day = CURDATE() AND eaten = 1
             GROUP BY meal
             ''', (user_id,)
         ).fetchall()  
@@ -177,7 +188,7 @@ def show_nutrition_today():
             FROM eating_histories 
             JOIN recipes 
             ON eating_histories.recipe_id = recipes.recipe_id
-            WHERE user_id = ? AND day = date('now') AND eaten = 1
+                WHERE user_id = ? AND day = CURDATE() AND eaten = 1
             GROUP BY day
             ''', (user_id,)
         ).fetchone()  

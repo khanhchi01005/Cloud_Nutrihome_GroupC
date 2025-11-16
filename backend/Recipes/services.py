@@ -1,18 +1,14 @@
 from flask import Flask, request, jsonify
-import sqlite3
 import datetime
 import json 
 import logging
 import os
+from db import get_db_connection
 
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
 
-DATABASE = os.path.join(os.path.dirname(os.getcwd()), 'nutrihome.db')
-def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+# Using MySQL via `backend/db.py` get_db_connection()
 
 # Show the list of recipe
 def show_recipe():
@@ -32,8 +28,7 @@ def show_recipe():
                             'id': recipe['recipe_id'],
                             'name': recipe['name'],
                             'image': recipe['image'][11:],
-                            'cooking_time': cooking_time,
-                            'rating': int(recipe['rating'])
+                            'cooking_time': cooking_time
                         }]
             
                 
@@ -52,7 +47,8 @@ def search_recipe_by_name():
         data = request.json 
         recipe_name = data.get('recipe_name')
         conn = get_db_connection()
-        recipe = conn.execute("SELECT * FROM recipes WHERE name ?", (recipe_name,)).fetchone()
+        # Use LIKE to search by partial name (was missing operator)
+        recipe = conn.execute("SELECT * FROM recipes WHERE name LIKE ?", (f"%{recipe_name}%",)).fetchone()
         conn.close()
         
         if recipe:
@@ -68,8 +64,7 @@ def search_recipe_by_name():
                             'id': recipe['recipe_id'],
                             'name': recipe['name'],
                             'image': recipe['image'][11:],
-                            'cooking_time': cooking_time,
-                            'rating': int(recipe['rating'])
+                            'cooking_time': cooking_time
                         }]
             return jsonify(recipe_dict), 200
 
@@ -89,7 +84,6 @@ def get_recipe_detail():
     SELECT name, 
         image, 
         cooking_time, 
-        rating, 
         ingredients, 
         steps, 
         carbs, 
@@ -110,7 +104,6 @@ def get_recipe_detail():
                 'name': recipe['name'],
                 'image': recipe['image'][11:],
                 'cooking_time': cooking_time,
-                'rating': recipe['rating'],
                 'ingredients': json.loads(recipe['ingredients']),
                 'steps': json.loads(recipe['steps']),
                 'carbs': recipe['carbs'],
@@ -128,7 +121,7 @@ def add_recipe_to_menu():
     user_id = data.get('user_id')
     recipe_id = data.get('recipe_id')
     meal = data.get('meal')
-    
+
     conn = get_db_connection()
     recipe = conn.execute("SELECT recipe_id FROM recipes WHERE recipe_id = ?", (recipe_id,)).fetchone()
     conn.close()
@@ -137,7 +130,7 @@ def add_recipe_to_menu():
         conn = get_db_connection()
         conn.execute("""
         INSERT INTO eating_histories (user_id,recipe_id, day,meal,eaten)
-        VALUES (?, ?, date('now'), ?,1)
+        VALUES (?, ?, CURDATE(), ?, 1)
         """, (user_id,recipe_id, meal))
         conn.commit()
         conn.close()

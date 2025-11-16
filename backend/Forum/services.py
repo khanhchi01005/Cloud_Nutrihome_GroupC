@@ -1,19 +1,13 @@
 from flask import Flask, request, jsonify
-import sqlite3
 import datetime
 import json 
 import logging
 from datetime import datetime 
 import os
+from db import get_db_connection
 
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
-
-DATABASE = os.path.join(os.path.dirname(os.getcwd()), 'nutrihome.db')
-def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 def show_all_post():
     conn = get_db_connection()
@@ -61,9 +55,8 @@ def up_new_post():
         with get_db_connection() as conn:
             conn.execute("""
             INSERT INTO posts (title, content, image, created_at, author_id, total_reacts, comments)
-            VALUES (?, ?, ?, date('now'), ?, 0, '{"comments":[]}')
+            VALUES (?, ?, ?, CURDATE(), ?, 0, '{"comments":[]}')
             """, (title, content, image, author['user_id']))
-            conn.commit()
 
         logger.debug(f"Post created with title: {title}, author_id: {author['user_id']}")
 
@@ -71,7 +64,7 @@ def up_new_post():
             'data': {
                 'title': title,
                 'content': content,
-                'image': image, 
+                'image': image,
                 'author': author['user_id'],
                 'created_at': datetime.now().isoformat(),
             },
