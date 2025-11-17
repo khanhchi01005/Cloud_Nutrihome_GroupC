@@ -6,7 +6,6 @@ from Family.services import (
     add_all_members_service,
     get_family_health_list_service,
     get_family_missing_nutrient_service,
-    get_shopping_list_service,
     get_family_detail1
 )
 
