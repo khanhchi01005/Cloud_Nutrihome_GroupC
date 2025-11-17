@@ -8,27 +8,28 @@ def create_family_service(family_name, user_id, image, description):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT COUNT(*) FROM families WHERE family_id = ?", (user_id,))
+        cursor.execute("SELECT COUNT(*) FROM families WHERE name = ?", (family_name,))
         if cursor.fetchone()[0] > 0:
             return {
-                'message': 'Family with this user_id already exists.',
+                'message': 'Family already exists.',
                 'status': 'error'
             }
 
         cursor.execute("""
-            INSERT INTO families (family_id, name, image, target_carbs, target_protein, target_fat, target_calories, description) 
-            VALUES (?, ?, ?, 0, 0, 0, 0, ?)
-        """, (user_id, family_name, image, description))
+            INSERT INTO families ( name, image,description) 
+            VALUES ( ?, ?, ?)
+        """, (family_name, image, description))
         
         # Cập nhật family_id cho người dùng
+        family_id = cursor.lastrowid
         cursor.execute("""
             UPDATE users SET family_id = ? WHERE user_id = ?
-        """, (user_id, user_id))
+        """, (family_id, user_id))
         
         conn.commit()
 
         return {
-            'family_id': user_id,
+            'family_id': family_id,
             'message': 'Family created successfully'
         }
         
