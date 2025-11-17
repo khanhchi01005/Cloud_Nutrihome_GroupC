@@ -73,13 +73,13 @@ def get_family_missing_nutrient():
     return jsonify(result)
 
 # API Đề xuất danh sách mua sắm cho gia đình
-@family_bp.route('/family/shopping-list', methods=['GET'])
-def get_shopping_list():
-    data = request.get_json()
-    family_id = data.get('family_id')
+# @family_bp.route('/family/shopping-list', methods=['GET'])
+# def get_shopping_list():
+#     data = request.get_json()
+#     family_id = data.get('family_id')
 
-    if not family_id:
-        return jsonify({'status': 'error', 'message': 'family_id and day are required'}), 400
+#     if not family_id:
+#         return jsonify({'status': 'error', 'message': 'family_id and day are required'}), 400
 
-    result = get_shopping_list_service(family_id)
-    return jsonify(result)
+#     result = get_shopping_list_service(family_id)
+#     return jsonify(result)

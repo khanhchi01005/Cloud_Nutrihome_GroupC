@@ -223,32 +223,32 @@ def get_family_missing_nutrient_service(family_id):
         }
     }
 
-def get_shopping_list_service(family_id):
-    conn = get_db_connection()
+# def get_shopping_list_service(family_id):
+#     conn = get_db_connection()
 
-    # Truy vấn danh sách mua sắm dựa trên `family_id` và `day`
-    result = conn.execute("""
-        SELECT suggested_ingredients
-        FROM suggested_ingredients
-        WHERE family_id = ?
-    """, (family_id,)).fetchall()
+#     # Truy vấn danh sách mua sắm dựa trên `family_id` và `day`
+#     result = conn.execute("""
+#         SELECT suggested_ingredients
+#         FROM suggested_ingredients
+#         WHERE family_id = ?
+#     """, (family_id,)).fetchall()
     
-    conn.close()  
+#     conn.close()  
     
-    if result:
-        # Chuyển đổi suggested_ingredients từ chuỗi JSON thành đối tượng Python
-        suggested_ingredients_list = []
-        for row in result:
-            # Giả sử row['suggested_ingredients'] là một chuỗi JSON
-            suggested_ingredients = json.loads(row['suggested_ingredients'])
-            suggested_ingredients_list.extend(suggested_ingredients['suggested_ingredients'])
+#     if result:
+#         # Chuyển đổi suggested_ingredients từ chuỗi JSON thành đối tượng Python
+#         suggested_ingredients_list = []
+#         for row in result:
+#             # Giả sử row['suggested_ingredients'] là một chuỗi JSON
+#             suggested_ingredients = json.loads(row['suggested_ingredients'])
+#             suggested_ingredients_list.extend(suggested_ingredients['suggested_ingredients'])
         
-        return {
-            "family_id": family_id,
-            "suggested_ingredients": suggested_ingredients_list
-        }
-    else:
-        return {"status": "error", "message": "No suggested ingredients found"}
+#         return {
+#             "family_id": family_id,
+#             "suggested_ingredients": suggested_ingredients_list
+#         }
+#     else:
+#         return {"status": "error", "message": "No suggested ingredients found"}
     
 def get_family_detail1(family_id):
     if not family_id:
