@@ -81,6 +81,48 @@ def add_all_members_service(family_id, usernames):
         'added_members': usernames
     }
 
+# Hàm tính các chỉ số dinh dưỡng hiện tại cho mỗi thành viên trong ngày hiện tại
+def calculate_nutrition_for_user(user_id):
+    conn = get_db_connection()
+    today = datetime.now().strftime('%Y-%m-%d')  # Lấy ngày hiện tại dưới dạng chuỗi 'YYYY-MM-DD'
+
+    # Truy vấn lịch sử ăn uống của thành viên trong ngày hiện tại
+    eating_history = conn.execute("""
+        SELECT recipe_id
+        FROM eating_histories 
+        WHERE user_id = ? AND day = ? AND eaten = 1
+    """, (user_id, today)).fetchall()
+
+    # Khởi tạo các chỉ số dinh dưỡng hiện tại
+    currentCarbs = 0
+    currentFat = 0
+    currentProtein = 0
+    currentCalo = 0
+
+    # Tính toán tổng các chỉ số dinh dưỡng dựa trên `eating_history` của ngày hiện tại
+    for entry in eating_history:
+        recipe = conn.execute("""
+            SELECT carbs, fat, protein, calories 
+            FROM recipes 
+            WHERE recipe_id = ?
+        """, (entry['recipe_id'],)).fetchone()
+        
+        if recipe:
+            
+            currentCarbs += recipe['carbs'] 
+            currentFat += recipe['fat'] 
+            currentProtein += recipe['protein'] 
+            currentCalo += recipe['calories'] 
+
+    conn.close()
+    
+    return {
+        "currentCarbs": currentCarbs,
+        "currentFat": currentFat,
+        "currentProtein": currentProtein,
+        "currentCalo": currentCalo
+    }
+
 def get_family_health_list_service(family_id):
     if not family_id:
         return {"status": "error", "message": "family_id is required"}
@@ -140,47 +182,7 @@ def get_family_health_list_service(family_id):
         "totalCurrentProtein": totalCurrentProtein
     }
 
-# Hàm tính các chỉ số dinh dưỡng hiện tại cho mỗi thành viên trong ngày hiện tại
-def calculate_nutrition_for_user(user_id):
-    conn = get_db_connection()
-    today = datetime.now().strftime('%Y-%m-%d')  # Lấy ngày hiện tại dưới dạng chuỗi 'YYYY-MM-DD'
 
-    # Truy vấn lịch sử ăn uống của thành viên trong ngày hiện tại
-    eating_history = conn.execute("""
-        SELECT recipe_id
-        FROM eating_histories 
-        WHERE user_id = ? AND day = ? AND eaten = 1
-    """, (user_id, today)).fetchall()
-
-    # Khởi tạo các chỉ số dinh dưỡng hiện tại
-    currentCarbs = 0
-    currentFat = 0
-    currentProtein = 0
-    currentCalo = 0
-
-    # Tính toán tổng các chỉ số dinh dưỡng dựa trên `eating_history` của ngày hiện tại
-    for entry in eating_history:
-        recipe = conn.execute("""
-            SELECT carbs, fat, protein, calories 
-            FROM recipes 
-            WHERE recipe_id = ?
-        """, (entry['recipe_id'],)).fetchone()
-        
-        if recipe:
-            
-            currentCarbs += recipe['carbs'] 
-            currentFat += recipe['fat'] 
-            currentProtein += recipe['protein'] 
-            currentCalo += recipe['calories'] 
-
-    conn.close()
-    
-    return {
-        "currentCarbs": currentCarbs,
-        "currentFat": currentFat,
-        "currentProtein": currentProtein,
-        "currentCalo": currentCalo
-    }
 
 
 def get_family_missing_nutrient_service(family_id):
