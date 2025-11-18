@@ -19,7 +19,7 @@ load_dotenv()
 def create_app():
     app = Flask(__name__)
 
-    FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    FRONTEND_URL = os.getenv("FRONTEND_URL")
     
     CORS(app, origins=FRONTEND_URL)
 

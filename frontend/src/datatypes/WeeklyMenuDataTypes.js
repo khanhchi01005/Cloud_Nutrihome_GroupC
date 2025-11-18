@@ -1,0 +1,2 @@
+// WeeklyMenuDataTypes.tsx
+export {};

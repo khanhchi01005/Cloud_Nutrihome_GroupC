@@ -1,7 +1,7 @@
 // contexts/AuthContext.tsx
 import { createContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
-import type { User } from "../hooks/user_hooks";
+import type { User } from "./hooks/user_hooks";
 
 interface AuthContextType {
   user: User | null;
