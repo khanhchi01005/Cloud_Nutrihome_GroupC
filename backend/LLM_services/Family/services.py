@@ -1,8 +1,4 @@
 from .AI_services import get_simple_family_meal
-from .AI_services import delete_family_weekly_menu
 
-def AI_generate_family_meal(family_id):
-    get_simple_family_meal(family_id)
-
-def Delete_family_weekly_menu(family_id):
-    delete_family_weekly_menu(family_id)
+def AI_generate_family_meal(family_id, start_date=None, end_date=None, available_ingredients=None):
+    get_simple_family_meal(family_id, start_date=start_date, end_date=end_date, available_ingredients=available_ingredients)

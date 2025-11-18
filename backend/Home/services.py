@@ -1,86 +1,92 @@
-from datetime import datetime
-import sqlite3
-import os
-# Connect to the SQLite database
-DATABASE = os.path.join(os.path.dirname(os.getcwd()), 'nutrihome.db')
+# utils/user_nutrition.py
+import pymysql
+from db_connector import get_db_connection
 
-def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+class UpdateError(Exception):
+    pass
 
-# Hàm tính các chỉ số dinh dưỡng hiện tại cho mỗi thành viên trong ngày hiện tại
-def calculate_nutrition_for_user(user_id):
-    conn = get_db_connection()
-    today = datetime.now().strftime('%Y-%m-%d')  # Lấy ngày hiện tại dưới dạng chuỗi 'YYYY-MM-DD'
+def get_user_nutrition(user_id: int):
+    """Lấy 4 chỉ số eaten của user từ DB"""
+    connection = None
+    try:
+        connection = get_db_connection()
+        if connection is None:
+            raise UpdateError("Cannot connect to database.")
 
-    # Truy vấn lịch sử ăn uống của thành viên trong ngày hiện tại
-    eating_history = conn.execute("""
-        SELECT recipe_id
-        FROM eating_histories 
-        WHERE user_id = ? AND day = ? AND eaten = 1
-    """, (user_id, today)).fetchall()
+        cursor = connection.cursor(pymysql.cursors.DictCursor)
+        cursor.execute(
+            "SELECT eaten_calories, eaten_carbs, eaten_fat, eaten_protein FROM users WHERE user_id=%s",
+            (user_id,)
+        )
+        user_data = cursor.fetchone()
+        return user_data
 
-    # Khởi tạo các chỉ số dinh dưỡng hiện tại
-    currentCarbs = 0
-    currentFat = 0
-    currentProtein = 0
-    currentCalo = 0
+    except pymysql.MySQLError as e:
+        raise UpdateError(f"Database error: {e}")
 
-    # Tính toán tổng các chỉ số dinh dưỡng dựa trên `eating_history` của ngày hiện tại
-    for entry in eating_history:
-        recipe = conn.execute("""
-            SELECT carbs, fat, protein, calories 
-            FROM recipes 
-            WHERE recipe_id = ?
-        """, (entry['recipe_id'],)).fetchone()
-        
-        if recipe:
-            
-            currentCarbs += recipe['carbs'] 
-            currentFat += recipe['fat'] 
-            currentProtein += recipe['protein'] 
-            currentCalo += recipe['calories'] 
+    finally:
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if connection:
+            connection.close()
 
-    conn.close()
-    
-    return {
-        "currentCarbs": currentCarbs,
-        "currentFat": currentFat,
-        "currentProtein": currentProtein,
-        "currentCalo": currentCalo
-    }
 
-def fetch_calorie_chart(user_id):
-    conn = get_db_connection()
+def update_user_nutrition(user_id: int, calories: float, carbs: float, fat: float, protein: float):
+    """Cập nhật 4 chỉ số eaten của user"""
+    connection = None
+    try:
+        connection = get_db_connection()
+        if connection is None:
+            raise UpdateError("Cannot connect to database.")
 
-    # Lấy chỉ tiêu dinh dưỡng của người dùng từ bảng users
-    user = conn.execute("""
-        SELECT target_calories, target_carbs, target_fat, target_protein 
-        FROM users 
-        WHERE user_id = ?
-    """, (user_id,)).fetchone()
-    if not user:
-        conn.close()
-        return {'status': 'error', 'message': 'User not found.'}, 404
+        cursor = connection.cursor()
+        connection.begin()
 
-    # Lấy dữ liệu hiện tại cho các chất dinh dưỡng
-    nutrition_data = calculate_nutrition_for_user(user_id)
-    
-    # Trả về dữ liệu cho biểu đồ dinh dưỡng
-    conn.close()
-    return {
-        'status': 'success',
-        'data': {
-            'chart': {
-                'goalCalories': user['target_calories'],
-                'goalCarbs': user['target_carbs'],
-                'goalFat': user['target_fat'],
-                'goalProtein': user['target_protein'],
-                'absorbedCalories': nutrition_data['currentCalo'],
-                'absorbedCarbs': nutrition_data['currentCarbs'],
-                'absorbedFat': nutrition_data['currentFat'],
-                'absorbedProtein': nutrition_data['currentProtein']
-            }
-        }
-    }, 200
+        update_query = """
+            UPDATE users
+            SET eaten_calories=%s, eaten_carbs=%s, eaten_fat=%s, eaten_protein=%s
+            WHERE user_id=%s
+        """
+        cursor.execute(update_query, (calories, carbs, fat, protein, user_id))
+        connection.commit()
+
+    except pymysql.MySQLError as e:
+        if connection:
+            connection.rollback()
+        raise UpdateError(f"Database error: {e}")
+
+    finally:
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+def update_user_nutrition_daily(user_id: int):
+    """Cập nhật 4 chỉ số eaten của user"""
+    connection = None
+    try:
+        connection = get_db_connection()
+        if connection is None:
+            raise UpdateError("Cannot connect to database.")
+
+        cursor = connection.cursor()
+        connection.begin()
+
+        update_query = """
+            UPDATE users
+            SET eaten_calories=0, eaten_carbs=0, eaten_fat=0, eaten_protein=0
+            WHERE user_id=%s
+        """
+        cursor.execute(update_query, (user_id,))
+        connection.commit()
+
+    except pymysql.MySQLError as e:
+        if connection:
+            connection.rollback()
+        raise UpdateError(f"Database error: {e}")
+
+    finally:
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if connection:
+            connection.close()

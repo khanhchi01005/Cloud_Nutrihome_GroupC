@@ -1,3 +1,5 @@
+import os
+from dotenv import load_dotenv
 from flask import Flask, jsonify
 from flask_cors import CORS
 from Recipes.controller  import recipes
@@ -10,10 +12,16 @@ from Weekly_menu.controller import menu_bp
 from Family.controller import family_bp
 from LLM_services.Weekly_menu.controller import user_bp
 from LLM_services.Family.controller import familyMenu_bp 
+from db_connector import test_connection
+
+load_dotenv()
 
 def create_app():
     app = Flask(__name__)
-    CORS(app, resources={r"/*": {"origins": "*"}}) # Cho phép frontend gọi sang nếu cần
+
+    FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    
+    CORS(app, origins=FRONTEND_URL)
 
     # Đăng ký các blueprint
     app.register_blueprint(auth_bp)
@@ -37,4 +45,5 @@ def create_app():
 
 if __name__ == "__main__":
     app = create_app()
+    test_connection()
     app.run(debug=True)

@@ -1,120 +1,186 @@
 from datetime import datetime, timedelta
-import sqlite3
 import os
+from db_connector import get_db_connection
 import easyocr 
 import json
 from dotenv import load_dotenv
 import requests
 from flask import request, jsonify
-# Connect to the SQLite database
-DATABASE = os.path.join(os.path.dirname(os.getcwd()), 'nutrihome.db')
-def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
-
+from collections import defaultdict
+from zoneinfo import ZoneInfo
+from pymysql.cursors import DictCursor
 
 def get_start_of_week():
-    today = datetime.today()
+    # Lấy thời gian hiện tại ở GMT+7
+    today = datetime.now(tz=ZoneInfo("Asia/Ho_Chi_Minh"))
+    # Tính ngày Monday đầu tuần
     start_of_week = today - timedelta(days=today.weekday())
-    return start_of_week
+
+    return start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+
+class GetWeeklyMenuError(Exception):
+    pass
+
+def add_nutrients(target: dict, meal: dict):
+    for key in ["calories", "carbs", "protein", "fat"]:
+        target[key] = target.get(key, 0) + (meal.get(key) or 0)
 
 def get_weekly_menu_service(user_id):
     conn = get_db_connection()
-    
-    # Ngày bắt đầu của tuần hiện tại (Thứ Hai) và 7 ngày tiếp theo
+    cursor = conn.cursor(DictCursor)
+
     start_of_week = get_start_of_week()
     end_of_week = start_of_week + timedelta(days=6)
 
-    # Tạo cấu trúc dữ liệu cho thực đơn cả tuần
-    days_of_week = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-    weekly_menu = {day.lower(): {"breakfast": [], "lunch": [], "dinner": []} for day in days_of_week}
+    days_of_week = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+    weekly_menu = {
+        day: {
+            meal_type: {
+                "items": [],
+                "nutrients": {},
+                "eaten": 0     # <--- thêm mặc định
+            }
+            for meal_type in ["breakfast", "lunch", "dinner"]
+        }
+        for day in days_of_week
+    }
 
-    # Truy vấn tất cả các bữa ăn của người dùng trong tuần hiện tại
-    meals = conn.execute("""
-    SELECT r.recipe_id, r.name, r.image, eh.meal, eh.day
-    FROM eating_histories eh
-    JOIN recipes r ON eh.recipe_id = r.recipe_id  
-    WHERE eh.user_id = ? AND eh.day BETWEEN ? AND ?
-    """, (user_id, start_of_week.strftime('%Y-%m-%d'), end_of_week.strftime('%Y-%m-%d'))).fetchall()
+    cursor.execute("""
+        SELECT r.recipe_id, r.name, r.image, eh.meal, eh.day, eh.eaten,
+               r.carbs, r.protein, r.fat, r.calories, r.cooking_time
+        FROM eating_histories eh
+        JOIN recipes r ON eh.recipe_id = r.recipe_id  
+        WHERE eh.user_id = %s AND eh.day BETWEEN %s AND %s
+    """, (user_id, start_of_week.strftime('%Y-%m-%d'), end_of_week.strftime('%Y-%m-%d')))
 
-    # Phân loại bữa ăn theo từng ngày trong tuần
+    meals = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
     for meal in meals:
-        meal_date_str = meal['day']
-        
-        # Kiểm tra và chuyển đổi chuỗi ngày, bỏ qua bất kỳ phần giờ nào nếu có
-        try:
-            meal_date = datetime.strptime(meal_date_str.strip(), '%Y-%m-%d')
-            day_of_week = meal_date.strftime('%a').lower()  # Lấy tên ngày trong tuần (mon, tue, ...)
-        except ValueError:
-            print(f"Lỗi định dạng ngày cho giá trị: {meal_date_str}")
+        day_str = meal.get("day", "").strip()
+        if not day_str:
             continue
 
-        # Thêm thông tin bữa ăn vào thực đơn của từng ngày
+        try:
+            day_of_week = datetime.strptime(day_str, "%Y-%m-%d").strftime('%a').lower()
+        except Exception:
+            continue
+
+        meal_type = meal.get("meal", "").strip().lower()
+        if meal_type not in ["breakfast", "lunch", "dinner"]:
+            continue
+
+        # Món ăn
         meal_data = {
-            "recipe_id": meal['recipe_id'],
-            "name": meal['name'],
-            "image": meal['image'][11:]
+            "recipe_id": meal["recipe_id"],
+            "name": meal["name"],
+            "image": meal["image"][11:] if meal["image"] else "",
+            "calories": meal.get("calories") or 0,
+            "carbs": meal.get("carbs") or 0,
+            "protein": meal.get("protein") or 0,
+            "fat": meal.get("fat") or 0,
+            "cooking_time": str(meal.get("cooking_time") or "00:00:00"),
+            "eaten": meal.get("eaten", 0)  # <--- LẤY TRẠNG THÁI ĐÃ ĂN CỦA MÓN
         }
 
-        if meal['meal'] == 'breakfast':  
-            weekly_menu[day_of_week]['breakfast'].append(meal_data)
-        elif meal['meal'] == 'lunch':
-            weekly_menu[day_of_week]['lunch'].append(meal_data)
-        elif meal['meal'] == 'dinner':
-            weekly_menu[day_of_week]['dinner'].append(meal_data)
+        weekly_menu[day_of_week][meal_type]["items"].append(meal_data)
 
-    conn.close()
+        # Cộng dinh dưỡng vào tổng
+        add_nutrients(weekly_menu[day_of_week][meal_type]["nutrients"], meal)
 
-    # # Định dạng lại dữ liệu cho JSON theo yêu cầu
-    # ordered_weekly_menu = [{day: weekly_menu[day]} for day in weekly_menu]
-    
-    return {
-        "status": "success",
-        "data": {
-            "menu": weekly_menu
-        }
-    }, 200
+    # -------------------------------
+    # 🔥 TÍNH "eaten" CHO TỪNG BỮA
+    # -------------------------------
+    for day in days_of_week:
+        for meal_type in ["breakfast", "lunch", "dinner"]:
+            items = weekly_menu[day][meal_type]["items"]
 
-def get_daily_nutrition_service(user_id):
+            if len(items) == 0:
+                weekly_menu[day][meal_type]["eaten"] = 0
+            else:
+                # Nếu *tất cả* items có eaten = 1 → eaten = 1
+                all_eaten = all(item.get("eaten", 0) == 1 for item in items)
+                weekly_menu[day][meal_type]["eaten"] = 1 if all_eaten else 0
+
+    return {"status": "success", "data": {"menu": weekly_menu}}, 200
+
+def add_custom_meal_service(data):
+    user_id = data.get('user_id')
+    name = data.get('name')
+    day = data.get('day')
+    meal = data.get('meal')
+
+    if not user_id or not name or not day or not meal:
+        return jsonify({
+            'status': 'error',
+            'message': 'Missing user_id, name, day, or meal'
+        }), 400
+
     conn = get_db_connection()
-    nutrition = conn.execute("""
-        SELECT SUM(carbs) as carbs, SUM(protein) as protein, SUM(fat) as fat, SUM(calories) as calories
-        FROM eating_histories
-        JOIN recipes ON eating_histories.recipe_id = recipes.recipe_id
-        WHERE user_id = ? AND date(day) = date('now')
-    """, (user_id,)).fetchone()
+    cursor = conn.cursor()
+
+    # 1. Tìm recipe_id từ bảng recipes
+    cursor.execute("SELECT recipe_id FROM recipes WHERE name = %s", (name,))
+    row = cursor.fetchone()
+    recipe_id = row[0] if row else None  # <-- sửa ở đây
+
+    # 2. Insert vào eating_histories
+    cursor.execute("""
+        INSERT INTO eating_histories (user_id, recipe_id, day, meal, eaten)
+        VALUES (%s, %s, %s, %s, 0)
+    """, (user_id, recipe_id, day, meal))
+
+    conn.commit()
     conn.close()
 
-    if nutrition:
-        return {
-            'status': 'success',
-            'data': {
-                'calories': nutrition['calories'],
-                'carbs': nutrition['carbs'],
-                'protein': nutrition['protein'],
-                'fat': nutrition['fat']
-            }
-        }, 200
-    else:
-        return {'status': 'error', 'message': 'Unable to load nutritional information.'}, 404
+    return jsonify({
+        'status': 'success',
+        'message': 'Custom meal added successfully'
+    }), 200
 
-def upload_receipt_service(file, user_id, meal):
+def remove_custom_meal_service(data):
+    user_id = data.get('user_id')
+    name = data.get('name')
+    day = data.get('day')
+    meal = data.get('meal')
+
+    if not user_id or not name or not day or not meal:
+        return jsonify({'status': 'error', 'message': 'Missing user_id, name, day, or meal'}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # 1. Tìm recipe_id từ bảng recipes
+    cursor.execute("SELECT recipe_id FROM recipes WHERE name = %s", (name,))
+    row = cursor.fetchone()
+    recipe_id = row[0] if row else None
+
+    # 2. Xóa trong eating_histories
+    cursor.execute(
+        """
+        DELETE FROM eating_histories
+        WHERE user_id = %s AND recipe_id = %s AND day = %s AND meal = %s
+        """,
+        (user_id, recipe_id, day, meal)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({'status': 'success', 'message': 'Custom meal removed successfully'}), 200
+
+def upload_receipt_service(image_path, user_id, day, meal):
     reader = easyocr.Reader(['vi'])
-
-    image_path = file
     results = reader.readtext(image_path, detail=0)
-
     all_text = ' '.join(results)
 
     load_dotenv()
     API_KEY = os.getenv("GEMINI_API_KEY")
     API_URL = os.getenv("GEMINI_API_URL")
 
-    headers = {'Content-Type': 'application/json'}
-
-    data = {
-        "contents": [
+    payload = {
+                "contents": [
             {
                 "parts": [
                     {
@@ -129,99 +195,136 @@ def upload_receipt_service(file, user_id, meal):
         ]
     }
 
-    response = requests.post(API_URL, headers=headers, data=json.dumps(data), params={"key": API_KEY})
-
+    response = requests.post(API_URL, headers={"Content-Type": "application/json"},
+                             data=json.dumps(payload), params={"key": API_KEY})
+    
     if response.status_code != 200:
-        print(f"Lỗi khi gọi API Gemini: {response.status_code}")
-        return
+        return {"error": "Gemini API failed"}
 
-    response_data = response.json()
-    dish_names = json.loads(response_data['candidates'][0]['content']['parts'][0]['text'])
+    gemini_data = response.json()
+
+    raw_text = gemini_data['candidates'][0]['content']['parts'][0]['text']
+
+    # Remove markdown code block if the model returns ```json ... ```
+    clean_text = raw_text.replace("```json", "").replace("```", "").strip()
+
+    try:
+        dish_names = json.loads(clean_text)
+    except Exception as e:
+        print("JSON parse failed:", clean_text)
+        raise e
 
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor()  # hoặc DictCursor nếu muốn
+
     list_of_food = []
 
     for dish in dish_names:
-        cursor.execute("SELECT recipe_id, name, image FROM recipes WHERE name LIKE ?", (f"%{dish}%",))
+        cursor.execute(
+            "SELECT recipe_id, name, image FROM recipes WHERE name LIKE %s", 
+            (f"%{dish}%",)
+        )
         recipe = cursor.fetchone()
-
         if recipe:
-            recipe_id, name, image = recipe
-
+            recipe_id, name, image = recipe  # tuple cursor
+            if not recipe_id:
+                print(f"Recipe {name} has no recipe_id, skip")
+                continue
             list_of_food.append({
                 "recipe_id": recipe_id,
                 "name": name,
-                "image": image[11:]
+                "image": image[11:] if image else None
             })
-
-            today = datetime.now().date()
             cursor.execute(
-                """
-                INSERT INTO eating_histories (user_id, recipe_id, day, meal, eaten)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (user_id, recipe_id, today, meal, 1)
+                "INSERT INTO eating_histories (user_id, recipe_id, day, meal, eaten) VALUES (%s,%s,%s,%s,%s)",
+                (user_id, recipe_id, day, meal, 0)
             )
+        else:
+            print(f"No recipe found for {dish}")
 
     conn.commit()
     conn.close()
 
     return {"listOfFood": list_of_food}
 
-def check_eaten():
-        data = request.json
-        user_id = data.get('user_id')
-        meal = data.get('meal')
-    
-        conn = get_db_connection()
-        person = conn.execute("SELECT * FROM eating_histories WHERE user_id = ?", (user_id,)).fetchone()
-        conn.close()
-        
-        today = datetime.now().date()
+def check_eaten(data):
+    user_id = data.get('user_id')
+    meal = data.get('meal')
+    day = data.get('day')
+    if not user_id or not meal or not day:
+        return jsonify({'status': 'error', 'message': 'Missing user_id, meal, or day'}), 400
 
-        if person:
-            conn = get_db_connection()
-            conn.execute("""
-            UPDATE eating_histories SET eaten = 1
-            WHERE user_id = ? AND day = ? AND meal =?
-            """, (user_id, today, meal))
-            conn.commit()
-            conn.close()
-            return jsonify({'status': 'success', 'message': 'Updated personal detail scuccessfully'}), 200 
-
-        
-        else:
-            return jsonify({'status': 'error', 'message': 'Failed to update personal detail'}), 404
-
-def reset_weekly_menu_service(user_id):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    start_of_week = get_start_of_week()
-    end_of_week = start_of_week + timedelta(days=6)
-
-    try:
-        cursor.execute("""
-            DELETE FROM eating_histories
-            WHERE user_id = ? 
-              AND eaten = 0
-              AND day BETWEEN ? AND ?
-        """, (user_id, start_of_week.strftime('%Y-%m-%d'), end_of_week.strftime('%Y-%m-%d')))
-
-        conn.commit()
-        deleted_count = cursor.rowcount
+    cursor.execute(
+        "SELECT recipe_id FROM eating_histories WHERE user_id=%s AND day=%s AND meal=%s",
+        (user_id, day, meal)
+    )
+    record = cursor.fetchone()
+    if not record:
         conn.close()
+        return jsonify({'status': 'error', 'message': 'No record found'}), 404
 
-        return {
-            'status': 'success',
-            'message': f'Đã xoá {deleted_count} mục trong thực đơn tuần này (eaten = 0).'
-        }, 200
-
-    except Exception as e:
-        conn.rollback()
+    recipe_id = record[0]  # tuple index
+    cursor.execute("SELECT carbs, protein, fat, calories FROM recipes WHERE recipe_id=%s", (recipe_id,))
+    nutri = cursor.fetchone()
+    if not nutri:
         conn.close()
-        return {
-            'status': 'error',
-            'message': f'Lỗi khi xoá dữ liệu: {str(e)}'
-        }, 500
+        return jsonify({'status': 'error', 'message': 'Recipe nutrition not found'}), 404
+
+    carbs, protein, fat, calories = nutri
+    cursor.execute(
+        "UPDATE users SET eaten_carbs=eaten_carbs+%s, eaten_protein=eaten_protein+%s, eaten_fat=eaten_fat+%s, eaten_calories=eaten_calories+%s WHERE user_id=%s",
+        (carbs, protein, fat, calories, user_id)
+    )
+    cursor.execute("UPDATE eating_histories SET eaten=1 WHERE user_id=%s AND day=%s AND meal=%s",
+                   (user_id, day, meal))
+    conn.commit()
+    conn.close()
+
+    return jsonify({'status': 'success', 'message': 'Updated eaten status & nutrition successfully'}), 200
+
+
+def check_undo_eaten(data):
+    user_id = data.get('user_id')
+    meal = data.get('meal')
+    day = data.get('day')
+    if not user_id or not meal or not day:
+        return jsonify({'status': 'error', 'message': 'Missing user_id, meal, or day'}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT recipe_id, eaten FROM eating_histories WHERE user_id=%s AND day=%s AND meal=%s",
+        (user_id, day, meal)
+    )
+    record = cursor.fetchone()
+    if not record:
+        conn.close()
+        return jsonify({'status': 'error', 'message': 'No record found'}), 404
+
+    recipe_id, eaten = record
+    if eaten == 0:
+        conn.close()
+        return jsonify({'status': 'error', 'message': 'Meal is not marked as eaten'}), 400
+
+    cursor.execute("SELECT carbs, protein, fat, calories FROM recipes WHERE recipe_id=%s", (recipe_id,))
+    nutri = cursor.fetchone()
+    if not nutri:
+        conn.close()
+        return jsonify({'status': 'error', 'message': 'Recipe nutrition not found'}), 404
+
+    carbs, protein, fat, calories = nutri
+    cursor.execute(
+        "UPDATE users SET eaten_carbs=eaten_carbs-%s, eaten_protein=eaten_protein-%s, eaten_fat=eaten_fat-%s, eaten_calories=eaten_calories-%s WHERE user_id=%s",
+        (carbs, protein, fat, calories, user_id)
+    )
+    cursor.execute("UPDATE eating_histories SET eaten=0 WHERE user_id=%s AND day=%s AND meal=%s",
+                   (user_id, day, meal))
+    conn.commit()
+    conn.close()
+
+    return jsonify({'status': 'success', 'message': 'Undo eaten successfully'}), 200
+

@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeIn {
+  animation: fadeIn 0.6s ease-out forwards;
+}
+
+/* global.css hoặc file CSS của bạn */
+.prose h1 { font-size: 2.25rem; } /* text-4xl */
+.prose h2 { font-size: 1.875rem; } /* text-3xl */
+.prose h3 { font-size: 1.5rem; } /* text-2xl */
+
+@keyframes glowPulse1 {
+  0%, 100% {
+    text-shadow: 0 0 6px #facc15;
+  }
+  50% {
+    text-shadow: 0 0 14px #fbbf24;
+  }
+}
+
+@keyframes glowPulse2 {
+  0%, 100% {
+    text-shadow:
+      0 0 6px #f0f9ff,
+      0 0 8px #f0f9ff,
+      0 0 12px #fbbf24,
+      0 0 18px #fbbf24;
+  }
+  50% {
+    text-shadow:
+      0 0 10px #fef9ff,
+      0 0 14px #fef9ff,
+      0 0 20px #fbbf24,
+      0 0 28px #f59e0b;
+  }
+}
+
+@keyframes glowPulse3 {
+  0%, 100% {
+    text-shadow:
+      0 0 12px #c7d2fe,
+      0 0 18px #8b5cf6,
+      0 0 26px #7c3aed,
+      0 0 32px #6d28d9,
+      0 0 40px #5b21b6;
+  }
+  50% {
+    text-shadow:
+      0 0 24px #a78bfa,
+      0 0 32px #8b5cf6,
+      0 0 40px #7c3aed,
+      0 0 50px #6d28d9,
+      0 0 60px #5b21b6;
+  }
+}
+
+.animate-glow-1 {
+  animation: glowPulse1 2.5s ease-in-out infinite;
+}
+
+.animate-glow-2 {
+  animation: glowPulse2 2.5s ease-in-out infinite;
+}
+
+.animate-glow-3 {
+  animation: glowPulse3 2.5s ease-in-out infinite;
+}
+
+@keyframes shimmerGlow {
+  0%, 100% {
+    box-shadow:
+      0 0 8px rgba(192, 192, 255, 0.6),
+      0 0 16px rgba(192, 192, 255, 0.5),
+      0 0 24px rgba(192, 192, 255, 0.4);
+  }
+  50% {
+    box-shadow:
+      0 0 12px rgba(192, 192, 255, 1),
+      0 0 24px rgba(192, 192, 255, 0.8),
+      0 0 36px rgba(192, 192, 255, 0.6);
+  }
+}
+
+@keyframes diamondGlow {
+  0%, 100% {
+    box-shadow:
+      0 0 10px rgba(139, 92, 246, 0.8),
+      0 0 20px rgba(139, 92, 246, 0.7),
+      0 0 30px rgba(139, 92, 246, 0.6),
+      0 0 40px rgba(199, 146, 255, 0.9),
+      0 0 60px rgba(199, 146, 255, 0.7);
+  }
+  50% {
+    box-shadow:
+      0 0 14px rgba(139, 92, 246, 1),
+      0 0 28px rgba(139, 92, 246, 0.9),
+      0 0 42px rgba(139, 92, 246, 0.8),
+      0 0 56px rgba(199, 146, 255, 1),
+      0 0 84px rgba(199, 146, 255, 0.8);
+  }
+}
+
+.animate-glow-platinum {
+  animation: shimmerGlow 3s ease-in-out infinite;
+}
+
+.animate-glow-diamond {
+  animation: diamondGlow 3.5s ease-in-out infinite;
+}

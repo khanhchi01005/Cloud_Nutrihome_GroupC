@@ -1,36 +1,44 @@
 from flask import Blueprint, request, jsonify
-from .services import login_user, register_user
+from .services import login_user, register_user, LoginError, RegisterError
 
-auth_bp = Blueprint('credentials', __name__)
+auth_bp = Blueprint('credentials', __name__, url_prefix='/api/credentials')
 
 # API for logging in
-@auth_bp.route('/api/credentials/login', methods=['POST'])
+@auth_bp.route('/login', methods=['POST'])
 def login():
-    data = request.json
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Dữ liệu JSON không hợp lệ"}), 400
+
     username = data.get('username')
     password = data.get('password')
 
-    user = login_user(username, password)
+    if not username or not password:
+        return jsonify({"error": "Thiếu username hoặc password"}), 400
 
-    if user:
-        return jsonify({
-            'status': 'success',
-            'data': {
-                'user': {
-                    'user_id': user['user_id'],
-                    'fullname': user['fullname'],
-                    'username': user['username'],
-                    'family_id': user['family_id']
+    try:
+        user = login_user(username, password)
+        if user:
+            # Trả về toàn bộ thông tin user
+            return jsonify({
+                "status": "success",
+                "data": {
+                    "user": user  # <-- trả nguyên dictionary user
                 }
-            }
-        }), 200
-    else:
-        return jsonify({'status': 'error', 'message': 'Invalid username or password'}), 401
+            }), 200
+        else:
+            return jsonify({"status": "error", "message": "Invalid username or password"}), 401
+
+    except LoginError as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
     
 # API for registering
-@auth_bp.route('/api/credentials/register', methods=['POST'])
+@auth_bp.route('/register', methods=['POST'])
 def register():
-    data = request.json
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Dữ liệu JSON không hợp lệ"}), 400
+
     fullname = data.get('fullname')
     username = data.get('username')
     password = data.get('password')
@@ -43,12 +51,14 @@ def register():
     allergen = data.get('allergen')
     gender = data.get('gender')
 
+    if not all([fullname, username, password, confirm_password, dob, height, weight, activity_level, gender]):
+        return jsonify({"status": "fail", "message": "Thiếu thông tin bắt buộc"}), 400
+
     if password != confirm_password:
-        return jsonify({'status': 'fail', 'message': 'Passwords do not match'}), 400
+        return jsonify({"status": "fail", "message": "Passwords do not match"}), 400
 
-    result = register_user(fullname, username, password, dob, height, weight, activity_level, disease, allergen, gender)
-
-    if result['status'] == 'fail':
-        return jsonify(result), 400
-
-    return jsonify(result), 201
+    try:
+        result = register_user(fullname, username, password, dob, height, weight, activity_level, disease, allergen, gender)
+        return jsonify(result), 201
+    except RegisterError as e:
+        return jsonify({"status": "fail", "message": str(e)}), 400

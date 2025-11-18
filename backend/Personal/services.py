@@ -1,18 +1,18 @@
 from flask import Flask, request, jsonify
-import sqlite3
 import datetime
 import json 
 import logging
 import os
+from db import get_db_connection
+import json
+from flask import request, jsonify
+from datetime import date, timedelta
+from collections import defaultdict
 
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
 
-DATABASE = os.path.join(os.path.dirname(os.getcwd()), 'nutrihome.db')
-def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+# Using MySQL via `backend/db.py` get_db_connection()
 
 #Show personal detail 
 def show_personal_detail():
@@ -54,161 +54,138 @@ def show_personal_detail():
     else:
         return jsonify({'status': 'error', 'message': 'Unavailable user'}), 404
 
-#Update personal detail
 def update_personal_detail():
-        data = request.json 
-        user_id = data.get('user_id')
-        height = data.get('height')
-        weight = data.get('weight')
-        activity_level = data.get('activity_level')
-        dob = data.get('dob')
-        disease = data.get('disease')
-        allergen = data.get('allergen')
-        fullname = data.get('fullname')
-        conn = get_db_connection()
-        person = conn.execute("SELECT user_id FROM eating_histories WHERE user_id = ?", (user_id,)).fetchone()
-        conn.close()
-        
-        if person:
-            conn = get_db_connection()
-            conn.execute("""
-            UPDATE users SET height = ?, weight = ?, activity_level = ?, disease = ?, dob = ?, allergen = ?, fullname = ?
-            WHERE user_id = ?
-            """, (height,weight,activity_level,user_id,disease,dob,allergen, fullname))
-            conn.commit()
-            conn.close()
-            return jsonify({'status': 'success', 'message': 'Updated personal detail scuccessfully'}), 200 
-        
-        else:
-            return jsonify({'status': 'error', 'message': 'Failed to update personal detail'}), 404
+    data = request.json
+    user_id = data.get('user_id')
 
-# Show nutrition history within 3 days
+    if not user_id:
+        return jsonify({'status': 'fail', 'message': 'user_id is required'}), 400
+
+    conn = get_db_connection()
+    person = conn.execute(
+        "SELECT user_id FROM users WHERE user_id = ?", (user_id,)
+    ).fetchone()
+
+    if not person:
+        conn.close()
+        return jsonify({'status': 'fail', 'message': 'User not found'}), 404
+
+    # Lấy các field có dữ liệu để update
+    fields_to_update = {}
+    for field in ['height', 'weight', 'activity_level', 'disease', 'dob', 'allergen', 'fullname']:
+        value = data.get(field)
+        if value is not None:
+            # Nếu disease hoặc allergen là list, convert sang JSON string
+            if field in ['disease', 'allergen'] and isinstance(value, list):
+                value = json.dumps(value)
+            fields_to_update[field] = value
+
+    if fields_to_update:
+        # Tạo câu SQL động chỉ update những field có dữ liệu
+        set_clause = ', '.join(f"{key} = ?" for key in fields_to_update)
+        params = list(fields_to_update.values())
+        params.append(user_id)  # cho WHERE user_id = ?
+
+        conn.execute(f"UPDATE users SET {set_clause} WHERE user_id = ?", params)
+        conn.commit()
+
+    conn.close()
+    return jsonify({'status': 'success', 'message': 'Updated personal detail successfully'}), 200
+
 def show_history():
-    data = request.json 
-    user_id = data.get('user_id')
-    conn = get_db_connection()
+    user_id = request.args.get("user_id")  # lấy từ query param
+    if not user_id:
+        return jsonify({"status": "error", "message": "Missing user_id"}), 400
 
-    user = conn.execute('SELECT user_id FROM eating_histories WHERE user_id = ?', (user_id,)).fetchone()
+    today = date.today()
+    last_5_days = [(today - timedelta(days=i)).isoformat() for i in range(5)]
+
+    conn = get_db_connection()
+    rows = conn.execute("""
+        SELECT
+            day,
+            SUM(carbs) AS carbs,
+            SUM(protein) AS protein,
+            SUM(fat) AS fat,
+            SUM(calories) AS calories
+        FROM eating_histories
+        JOIN recipes ON eating_histories.recipe_id = recipes.recipe_id
+        WHERE user_id = ?
+          AND day BETWEEN DATE_SUB(CURDATE(), INTERVAL 4 DAY) AND CURDATE()
+        GROUP BY day
+    """, (user_id,)).fetchall()
     conn.close()
 
-    if user:
-        conn = get_db_connection()
-        nutrition_data = conn.execute(
-            '''
-            SELECT
-                day,
-                meal,
-                GROUP_CONCAT(recipes.name, ',') AS recipes,
-                SUM(carbs) AS carbs,
-                SUM(protein) AS protein,
-                SUM(fat) AS fat,
-                SUM(calories) AS calories
-            FROM eating_histories 
-            JOIN recipes 
-            ON eating_histories.recipe_id = recipes.recipe_id
-            WHERE user_id = ? 
-                AND day BETWEEN date('now', '-2 days') AND date('now')  -- Past 3 days, including today
-            GROUP BY day, meal;
-            ''', (user_id,)
-        ).fetchall()
-        conn.close()
+    # Khởi tạo kết quả mặc định
+    result = {day: {"carbs": 0, "protein": 0, "fat": 0, "calories": 0} for day in last_5_days}
 
-        result = {}
+    for row in rows:
+        day = row["day"]
+        if day in result:
+            result[day]["carbs"] = row["carbs"] or 0
+            result[day]["protein"] = row["protein"] or 0
+            result[day]["fat"] = row["fat"] or 0
+            result[day]["calories"] = row["calories"] or 0
 
-        for row in nutrition_data:
-            day = row['day']
-            
-            # Initialize the day if not already in result
-            if day not in result:
-                result[day] = {
-                    "meals": {},
-                    "carbs": 0,
-                    "fat": 0,
-                    "protein": 0,
-                    "calories": 0
-                }
-            
-            result[day]["meals"][row['meal']] = row['recipes'].split(',') if row['recipes'] else []
-            result[day]["carbs"] += row['carbs'] or 0
-            result[day]["fat"] += row['fat'] or 0
-            result[day]["protein"] += row['protein'] or 0
-            result[day]["calories"] += row['calories'] or 0
+    return jsonify({"status": "success", "data": result}), 200
 
-        # Directly return the result dictionary instead of a list
-        return jsonify({'status': 'success', 'data': result}), 200, {'Content-Type': 'application/json'}
+def show_history_day_menu():
+    user_id = request.args.get("user_id")
+    day = request.args.get("day")  # dạng "YYYY-MM-DD"
 
-    return jsonify({'status': 'error', 'message': 'User not found'}), 404
+    if not user_id or not day:
+        return jsonify({"status": "error", "message": "Missing user_id or day"}), 400
 
-
-#Show today's nutrition history 
-def show_nutrition_today():
-    data = request.json 
-    user_id = data.get('user_id')
     conn = get_db_connection()
-    
-    user = conn.execute('SELECT user_id FROM eating_histories WHERE user_id = ?', (user_id,)).fetchone()
+    rows = conn.execute("""
+        SELECT 
+            eh.meal,
+            r.recipe_id,
+            r.name,
+            r.image,
+            r.calories,
+            r.carbs,
+            r.protein,
+            r.fat,
+            r.cooking_time,
+            eh.eaten
+        FROM eating_histories eh
+        JOIN recipes r ON eh.recipe_id = r.recipe_id
+        WHERE eh.user_id = ?
+          AND eh.day = ?
+          AND eh.eaten = 1
+    """, (user_id, day)).fetchall()
     conn.close()
-    
-    if user:
-        conn = get_db_connection()
-        each_meal_data = conn.execute(
-            '''
-            SELECT 
-                meal, 
-                SUM(carbs) AS "carbs",
-                SUM(protein) AS "protein",
-                SUM(fat) AS "fat",
-                SUM(calories) AS "calories"
-            FROM eating_histories 
-            JOIN recipes 
-            ON eating_histories.recipe_id = recipes.recipe_id
-            WHERE user_id = ? AND day = date('now') AND eaten = 1
-            GROUP BY meal
-            ''', (user_id,)
-        ).fetchall()  
-        
-        total_meal_data = conn.execute(
-            '''
-            SELECT  
-                SUM(carbs) AS "carbs",
-                SUM(protein) AS "protein",
-                SUM(fat) AS "fat",
-                SUM(calories) AS "calories"
-            FROM eating_histories 
-            JOIN recipes 
-            ON eating_histories.recipe_id = recipes.recipe_id
-            WHERE user_id = ? AND day = date('now') AND eaten = 1
-            GROUP BY day
-            ''', (user_id,)
-        ).fetchone()  
-        
-        conn.close()
-        
-        meals = {}
-        for row in each_meal_data:
-            meal = row['meal']
-            meals[meal] = {
-                "carbs": str(row['carbs'] or 0),
-                "protein": str(row['protein'] or 0),
-                "fat": str(row['fat'] or 0)
-            }
-        
-        total_nutrients = {
-            "carbs": str(total_meal_data['carbs'] or 0),
-            "protein": str(total_meal_data['protein'] or 0),
-            "fat": str(total_meal_data['fat'] or 0)
-        }
-        
-        final_result = {
-            "status": "success",
-            "data": {
-                "breakfast": meals.get("breakfast", {"carbs": "0", "protein": "0", "fat": "0"}),
-                "lunch": meals.get("lunch", {"carbs": "0", "protein": "0", "fat": "0"}),
-                "dinner": meals.get("dinner", {"carbs": "0", "protein": "0", "fat": "0"}),
-                "total_nutrients": total_nutrients
-            }
-        }
-        
-        return jsonify(final_result), 200, {'Content-Type': 'application/json'}
 
-    return jsonify({'status': 'error', 'message': 'User not found'}), 404
+    result = {}
+
+    # Khởi tạo các bữa ăn mặc định
+    meals = ["breakfast", "lunch", "dinner"]
+    for m in meals:
+        result[m] = {"items": [], "nutrients": {"calories": 0, "carbs": 0, "protein": 0, "fat": 0}}
+
+    # Gom dữ liệu
+    for row in rows:
+        meal_name = row["meal"]
+        if meal_name not in result:
+            result[meal_name] = {"items": [], "nutrients": {"calories": 0, "carbs": 0, "protein": 0, "fat": 0}}
+
+        item = {
+            "recipe_id": row["recipe_id"],
+            "name": row["name"],
+            "image": row["image"],
+            "calories": row["calories"] or 0,
+            "carbs": row["carbs"] or 0,
+            "protein": row["protein"] or 0,
+            "fat": row["fat"] or 0,
+            "cooking_time": row["cooking_time"] or "00:30:00",
+            "eaten": row["eaten"] or 0,
+        }
+
+        result[meal_name]["items"].append(item)
+        result[meal_name]["nutrients"]["calories"] += item["calories"]
+        result[meal_name]["nutrients"]["carbs"] += item["carbs"]
+        result[meal_name]["nutrients"]["protein"] += item["protein"]
+        result[meal_name]["nutrients"]["fat"] += item["fat"]
+
+    return jsonify({"status": "success", "data": result}), 200
