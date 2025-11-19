@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { FiShoppingBag, FiCpu, FiGift, FiTarget, FiBarChart2, FiPackage , FiFileText } from "react-icons/fi";
+import { FiShoppingBag, FiCpu, FiGift, FiTarget, FiBarChart2, FiPackage, FiFileText } from "react-icons/fi";
 import ChatBox from "./ChatBox";
 
 const features = [
-  { name: "Cửa hàng", route: "/search?type=shop", icon: <FiShoppingBag  /> },
-  { name: "Sản phẩm", route: "/search?type=product", icon: <FiPackage  /> },
+  { name: "Cửa hàng", route: "/search?type=shop", icon: <FiShoppingBag /> },
+  { name: "Sản phẩm", route: "/search?type=product", icon: <FiPackage /> },
   { name: "AI gợi ý", isChat: true, icon: <FiCpu /> }, // đánh dấu mở chat
   { name: "Voucher", route: "/voucher", icon: <FiGift /> },
   { name: "Minigame", route: "/game", icon: <FiTarget /> },
@@ -47,7 +47,7 @@ export default function FeatureCards() {
         )}
       </div>
 
-      {/* Chatbox Soulista */}
+      {/* Chatbox nutrihome */}
       {openChat && (
         <div className="fixed bottom-20 right-18 w-96 h-[510px] z-50">
           <ChatBox onClose={() => setOpenChat(false)} />

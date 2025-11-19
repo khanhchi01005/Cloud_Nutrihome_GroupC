@@ -9,7 +9,7 @@ export function useGenerateFamilyMeal() {
         setError(null);
         setSuccess(null);
         try {
-            const res = await apiPost("/generate-family-meal", payload);
+            const res = await apiPost("/api/llm-services/generate-family-meal", payload);
             if (res?.message) {
                 setSuccess(res.message);
             }

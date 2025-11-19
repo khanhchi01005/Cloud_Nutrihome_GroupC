@@ -86,23 +86,23 @@ export default function HomePage() {
     {
       title: "6 món ăn giàu protein giúp bạn khỏe mạnh hơn",
       summary: "Protein là dưỡng chất thiết yếu cho cơ thể. Dưới đây là danh sách 6 món vừa ngon vừa bổ.",
-      image: "/images/user/mambo.jpg",
-      author: "Nguyễn Văn A",
-      date: "2025-02-12",
+      image: "https://nutrihome-assets.s3.ap-southeast-1.amazonaws.com/images/posts/1.jpg",
+      author: "Nguyễn Phước Ngưỡng Long",
+      date: "2025-11-12",
     },
     {
       title: "Cách lên thực đơn giảm cân an toàn cho sinh viên",
       summary: "Chỉ cần vài mẹo nhỏ bạn có thể giảm cân mà không cần ăn kiêng khắc nghiệt.",
-      image: "/images/user/mambo.jpg",
-      author: "Trần Thị B",
-      date: "2025-02-10",
+      image: "https://nutrihome-assets.s3.ap-southeast-1.amazonaws.com/images/posts/2.jpg",
+      author: "Hoàng Khánh Chi",
+      date: "2025-11-10",
     },
     {
       title: "Top 5 món ăn nhanh nhưng vẫn đủ dinh dưỡng",
       summary: "Bận rộn không có nghĩa là ăn thiếu chất. Đây là 5 lựa chọn tối ưu.",
-      image: "/images/user/mambo.jpg",
-      author: "Lê Văn C",
-      date: "2025-02-08",
+      image: "https://nutrihome-assets.s3.ap-southeast-1.amazonaws.com/images/posts/3.jpg",
+      author: "Đinh Minh Vũ",
+      date: "2025-11-08",
     },
   ];
 

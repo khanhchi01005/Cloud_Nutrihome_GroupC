@@ -7,7 +7,7 @@ import rehypeRaw from "rehype-raw";
 
 const USER_NAME = "Long";
 const USER_AVA = "/images/user/mambo.jpg";
-const BOT_NAME = "Soulista";
+const BOT_NAME = "nutrihome";
 const BOT_AVA = "/images/user/mambo.jpg";
 
 function TypingDots() {
@@ -79,30 +79,30 @@ export default function ChatBox() {
 
             {/* bot bubble */}
             <div className="flex justify-start items-start gap-2">
-            <img src={BOT_AVA} className="w-8 h-8 rounded-full" />
-            <div className="flex flex-col max-w-[70%]">
+              <img src={BOT_AVA} className="w-8 h-8 rounded-full" />
+              <div className="flex flex-col max-w-[70%]">
                 {/* Tên bot */}
                 <span className="text-xs text-gray-500 mb-1">{BOT_NAME}</span>
 
                 {/* Hiển thị đang trả lời ngay dưới tên */}
                 {i === history.length - 1 && botTyping && (
-                <span className="text-xs text-gray-500 opacity-70 mb-1">
+                  <span className="text-xs text-gray-500 opacity-70 mb-1">
                     <TypingDots />
-                </span>
+                  </span>
                 )}
 
                 {/* Nội dung trả lời */}
                 {h.bot && (
-                <div className="bg-gray-100 text-gray-800 px-4 py-2 rounded-2xl rounded-bl-none prose prose-sm">
+                  <div className="bg-gray-100 text-gray-800 px-4 py-2 rounded-2xl rounded-bl-none prose prose-sm">
                     <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    rehypePlugins={[rehypeRaw]}
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeRaw]}
                     >
-                    {h.bot}
+                      {h.bot}
                     </ReactMarkdown>
-                </div>
+                  </div>
                 )}
-            </div>
+              </div>
             </div>
 
           </div>

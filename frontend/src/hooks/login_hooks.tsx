@@ -24,7 +24,19 @@ export function useLogin() {
         password,
       });
 
-      // --- LẤY RECIPES SAU KHI LOGIN THÀNH CÔNG ---
+      const user = data.data.user;
+
+      // --- GỌI API TÍNH LẠI CALO SAU LOGIN ---
+      try {
+        await apiPost("/api/home/update_calories", {
+          user_id: user.user_id,
+        });
+        console.log("Đã cập nhật eaten_* cho user sau login");
+      } catch (err) {
+        console.error("Không cập nhật được calories:", err);
+      }
+
+      // --- LẤY RECIPES SAU KHI LOGIN ---
       try {
         const recipesRes = await apiGet<{ status: string; data?: any[] }>(
           "/api/recipes/get-all"
@@ -38,9 +50,7 @@ export function useLogin() {
         console.error("Không fetch được recipes:", recipesErr);
       }
 
-      const user = data.data.user;
-
-      // Cập nhật context + localStorage
+      // Lưu user vào context & localStorage
       setUser(user);
       localStorage.setItem("user", JSON.stringify(user));
 

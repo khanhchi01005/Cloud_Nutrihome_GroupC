@@ -23,7 +23,7 @@ export function useGenerateFamilyMeal() {
         status: string;
         data?: any;
         message?: string;
-      }>("/generate-family-meal", payload);
+      }>("/api/llm-services/generate-family-meal", payload);
 
       if (res?.message) {
         setSuccess(res.message);

@@ -7,7 +7,7 @@ import rehypeRaw from "rehype-raw";
 
 const USER_NAME = "Long";
 const USER_AVA = "/images/user/mambo.jpg";
-const BOT_NAME = "Soulista";
+const BOT_NAME = "nutrihome";
 const BOT_AVA = "/images/Logo.png";
 
 function TypingDots() {
@@ -25,9 +25,9 @@ export default function ChatBox({ onClose }: { onClose: () => void }) {
   const { mutate: ask } = useChatAsk();
   const [input, setInput] = useState("");
   const [history, setHistory] = useState<{ user: string; bot: string }[]>(() => {
-    const saved = localStorage.getItem("soulista_history");
+    const saved = localStorage.getItem("nutrihome_history");
     return saved ? JSON.parse(saved) : [];
-    });
+  });
   const [botTyping, setBotTyping] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const [isLarge, setIsLarge] = useState(false); // state phóng to
@@ -77,28 +77,27 @@ export default function ChatBox({ onClose }: { onClose: () => void }) {
   }, [history]);
 
   useEffect(() => {
-  localStorage.setItem("soulista_history", JSON.stringify(history));
-}, [history]);
+    localStorage.setItem("nutrihome_history", JSON.stringify(history));
+  }, [history]);
 
 
   return (
     <div
-    className={`flex flex-col border rounded-lg shadow-lg bg-white transition-all duration-300 absolute bottom-0 right-0 ${
-        isLarge ? "h-[700px] w-[600px]" : "h-[500px] w-[384px]"
-    }`}
+      className={`flex flex-col border rounded-lg shadow-lg bg-white transition-all duration-300 absolute bottom-0 right-0 ${isLarge ? "h-[700px] w-[600px]" : "h-[500px] w-[384px]"
+        }`}
     >
       {/* Header với nút đóng và phóng to */}
       <div className="flex items-center justify-between p-4 bg-indigo-600 text-white font-semibold rounded-t-lg">
         <div className="flex items-center gap-2">
           <img src={BOT_AVA} className="w-8 h-8 rounded-full" />
-          <span>Soulista Chatbot</span>
+          <span>nutrihome Chatbot</span>
         </div>
         <div className="flex items-center gap-2">
           {/* Reset lịch sử chat */}
           <button
             onClick={() => {
               setHistory([]);
-              localStorage.removeItem("soulista_history");
+              localStorage.removeItem("nutrihome_history");
             }}
             className="cursor-pointer p-1 rounded-full hover:bg-indigo-500"
             aria-label="Reset lịch sử"
@@ -132,9 +131,9 @@ export default function ChatBox({ onClose }: { onClose: () => void }) {
             <div className="flex justify-end items-start gap-2">
               <div className="flex flex-col items-end max-w-[70%]">
                 <span className="text-xs text-gray-500 mb-1">{USER_NAME}</span>
-                    <div className="bg-indigo-500 text-white px-4 py-2 rounded-2xl rounded-tr-none">
-                    {h.user}
-                    </div>
+                <div className="bg-indigo-500 text-white px-4 py-2 rounded-2xl rounded-tr-none">
+                  {h.user}
+                </div>
               </div>
               <img src={USER_AVA} className="w-8 h-8 rounded-full" />
             </div>

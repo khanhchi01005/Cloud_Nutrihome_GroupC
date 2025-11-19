@@ -7,7 +7,7 @@ import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 const USER_NAME = "Long";
 const USER_AVA = "/images/user/mambo.jpg";
-const BOT_NAME = "Soulista";
+const BOT_NAME = "nutrihome";
 const BOT_AVA = "/images/user/mambo.jpg";
 function TypingDots() {
     const [dots, setDots] = useState(".");

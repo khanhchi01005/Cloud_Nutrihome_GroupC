@@ -16,7 +16,7 @@ export default function Header() {
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   const foodSuggestions = [
-    "Cơm gà", "Bún bò", "Phở", "Salad", "Trứng hấp", "Ức gà nướng", "Súp bí đỏ"
+    "Cơm", "Bún bò", "Phở", "Salad", "Trứng", "Gà", "Canh", "Cháo", "Mì xào", "Bánh mì"
   ];
 
   const handleSearch = (q?: string) => {
@@ -142,7 +142,7 @@ export default function Header() {
                 >
                   {user.username ? (
                     <img
-                      src={"images/user/mambo.jpg"}
+                      src={user.avatar}
                       alt={user.username}
                       className="h-6 w-6 rounded-full object-cover"
                     />
@@ -151,7 +151,13 @@ export default function Header() {
                 </button>
 
                 {userMenuOpen && (
-                  <div className="absolute right-0 mt-1 w-40 bg-white text-black rounded shadow z-50">
+                  <div className="absolute right-0 mt-1 w-48 bg-white text-black rounded shadow z-50">
+                    <button
+                      onClick={() => { navigate("/profile"); setUserMenuOpen(false); }}
+                      className="rounded w-full text-left px-4 py-2 hover:bg-gray-200 cursor-pointer"
+                    >
+                      Cập nhật thông tin cá nhân
+                    </button>
                     <button
                       onClick={() => { logout(); setUserMenuOpen(false); navigate("/"); }}
                       className="rounded w-full text-left px-4 py-2 hover:bg-gray-200 cursor-pointer"
@@ -160,6 +166,7 @@ export default function Header() {
                     </button>
                   </div>
                 )}
+
               </div>
             ) : (
               <Link
