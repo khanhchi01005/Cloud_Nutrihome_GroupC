@@ -75,7 +75,7 @@ def get_weekly_menu_service(user_id):
         meal_data = {
             "recipe_id": meal["recipe_id"],
             "name": meal["name"],
-            "image": meal["image"][11:] if meal["image"] else "",
+            "image": meal["image"] if meal["image"] else "",
             "calories": meal.get("calories") or 0,
             "carbs": meal.get("carbs") or 0,
             "protein": meal.get("protein") or 0,
@@ -257,34 +257,45 @@ def check_eaten(data):
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # Lấy tất cả recipe_id của bữa ăn
     cursor.execute(
         "SELECT recipe_id FROM eating_histories WHERE user_id=%s AND day=%s AND meal=%s",
         (user_id, day, meal)
     )
-    record = cursor.fetchone()
-    if not record:
+    records = cursor.fetchall()
+    if not records:
         conn.close()
         return jsonify({'status': 'error', 'message': 'No record found'}), 404
 
-    recipe_id = record[0]  # tuple index
-    cursor.execute("SELECT carbs, protein, fat, calories FROM recipes WHERE recipe_id=%s", (recipe_id,))
+    recipe_ids = [r[0] for r in records]
+
+    # SUM dinh dưỡng từ nhiều recipe
+    cursor.execute(
+        f"SELECT SUM(carbs), SUM(protein), SUM(fat), SUM(calories) FROM recipes WHERE recipe_id IN ({','.join(['%s']*len(recipe_ids))})",
+        recipe_ids
+    )
     nutri = cursor.fetchone()
     if not nutri:
         conn.close()
         return jsonify({'status': 'error', 'message': 'Recipe nutrition not found'}), 404
 
     carbs, protein, fat, calories = nutri
+
+    # Cộng vào user
     cursor.execute(
         "UPDATE users SET eaten_carbs=eaten_carbs+%s, eaten_protein=eaten_protein+%s, eaten_fat=eaten_fat+%s, eaten_calories=eaten_calories+%s WHERE user_id=%s",
         (carbs, protein, fat, calories, user_id)
     )
-    cursor.execute("UPDATE eating_histories SET eaten=1 WHERE user_id=%s AND day=%s AND meal=%s",
-                   (user_id, day, meal))
+
+    # Cập nhật toàn bộ meal là eaten = 1
+    cursor.execute(
+        "UPDATE eating_histories SET eaten=1 WHERE user_id=%s AND day=%s AND meal=%s",
+        (user_id, day, meal)
+    )
+
     conn.commit()
     conn.close()
-
     return jsonify({'status': 'success', 'message': 'Updated eaten status & nutrition successfully'}), 200
-
 
 def check_undo_eaten(data):
     user_id = data.get('user_id')
@@ -296,35 +307,49 @@ def check_undo_eaten(data):
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # Lấy danh sách recipe + trạng thái eaten
     cursor.execute(
         "SELECT recipe_id, eaten FROM eating_histories WHERE user_id=%s AND day=%s AND meal=%s",
         (user_id, day, meal)
     )
-    record = cursor.fetchone()
-    if not record:
+    records = cursor.fetchall()
+    if not records:
         conn.close()
         return jsonify({'status': 'error', 'message': 'No record found'}), 404
 
-    recipe_id, eaten = record
-    if eaten == 0:
+    # Nếu ALL eaten = 0 thì không cho undo
+    if all(r[1] == 0 for r in records):
         conn.close()
         return jsonify({'status': 'error', 'message': 'Meal is not marked as eaten'}), 400
 
-    cursor.execute("SELECT carbs, protein, fat, calories FROM recipes WHERE recipe_id=%s", (recipe_id,))
+    recipe_ids = [r[0] for r in records]
+
+    cursor.execute(
+        f"SELECT SUM(carbs), SUM(protein), SUM(fat), SUM(calories) FROM recipes WHERE recipe_id IN ({','.join(['%s']*len(recipe_ids))})",
+        recipe_ids
+    )
     nutri = cursor.fetchone()
     if not nutri:
         conn.close()
         return jsonify({'status': 'error', 'message': 'Recipe nutrition not found'}), 404
 
     carbs, protein, fat, calories = nutri
+
+    # Trừ ra khỏi user
     cursor.execute(
         "UPDATE users SET eaten_carbs=eaten_carbs-%s, eaten_protein=eaten_protein-%s, eaten_fat=eaten_fat-%s, eaten_calories=eaten_calories-%s WHERE user_id=%s",
         (carbs, protein, fat, calories, user_id)
     )
-    cursor.execute("UPDATE eating_histories SET eaten=0 WHERE user_id=%s AND day=%s AND meal=%s",
-                   (user_id, day, meal))
+
+    # Set toàn bộ meal thành chưa ăn
+    cursor.execute(
+        "UPDATE eating_histories SET eaten=0 WHERE user_id=%s AND day=%s AND meal=%s",
+        (user_id, day, meal)
+    )
+
     conn.commit()
     conn.close()
 
     return jsonify({'status': 'success', 'message': 'Undo eaten successfully'}), 200
+
 

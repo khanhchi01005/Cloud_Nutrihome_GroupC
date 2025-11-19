@@ -10,7 +10,7 @@ personal = Blueprint("personal", __name__, url_prefix='/api/personal')
 def show_detail():
     return show_personal_detail()
 
-@personal.route("/update", methods = ['PATCH'])
+@personal.route("/update", methods = ['POST'])
 def update_detail():
     return update_personal_detail()
 

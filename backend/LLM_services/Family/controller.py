@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from .services import AI_generate_family_meal
 
-familyMenu_bp = Blueprint("familyMenu_bp", __name__)
+familyMenu_bp = Blueprint("familyMenu_bp", __name__, url_prefix='/api/llm-services')
 
 # API tạo thực đơn cho gia đình
 @familyMenu_bp.route("/generate-family-meal", methods=["POST"])

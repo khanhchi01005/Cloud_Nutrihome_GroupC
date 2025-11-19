@@ -8,6 +8,7 @@ import json
 from flask import request, jsonify
 from datetime import date, timedelta
 from collections import defaultdict
+import boto3
 
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
@@ -54,9 +55,18 @@ def show_personal_detail():
     else:
         return jsonify({'status': 'error', 'message': 'Unavailable user'}), 404
 
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+    region_name="ap-southeast-1"
+)
+
+S3_BUCKET = os.getenv("AWS_S3_BUCKET")
+
 def update_personal_detail():
-    data = request.json
-    user_id = data.get('user_id')
+    # Dùng form thay vì JSON vì chứa file
+    user_id = request.form.get('user_id')
 
     if not user_id:
         return jsonify({'status': 'fail', 'message': 'user_id is required'}), 400
@@ -70,27 +80,58 @@ def update_personal_detail():
         conn.close()
         return jsonify({'status': 'fail', 'message': 'User not found'}), 404
 
-    # Lấy các field có dữ liệu để update
+    # --- UPDATE THÔNG TIN VĂN BẢN (height, weight, ...)
     fields_to_update = {}
     for field in ['height', 'weight', 'activity_level', 'disease', 'dob', 'allergen', 'fullname']:
-        value = data.get(field)
+        value = request.form.get(field)
         if value is not None:
-            # Nếu disease hoặc allergen là list, convert sang JSON string
-            if field in ['disease', 'allergen'] and isinstance(value, list):
-                value = json.dumps(value)
+            if field in ['disease', 'allergen']:
+                try:
+                    value = json.dumps(json.loads(value))
+                except:
+                    pass
             fields_to_update[field] = value
 
+    # --- Nếu có file avatar -> upload lên S3 private
+    avatar_file = request.files.get("avatar")
+    if avatar_file:
+        s3_path = f"images/users/{user_id}.jpg"
+        try:
+            s3_path = f"images/users/{user_id}.jpg"
+            s3.upload_fileobj(
+                avatar_file,
+                S3_BUCKET,
+                s3_path,
+                ExtraArgs={"ContentType": "image/jpeg"}  # public
+            )
+
+            # URL cố định
+            avatar_url = f"https://{S3_BUCKET}.s3.amazonaws.com/{s3_path}"
+            fields_to_update["avatar"] = avatar_url
+
+
+        except Exception as e:
+            conn.close()
+            return jsonify({
+                "status": "fail",
+                "message": f"S3 upload error: {str(e)}"
+            }), 500
+
+    # --- UPDATE DATABASE
     if fields_to_update:
-        # Tạo câu SQL động chỉ update những field có dữ liệu
         set_clause = ', '.join(f"{key} = ?" for key in fields_to_update)
         params = list(fields_to_update.values())
-        params.append(user_id)  # cho WHERE user_id = ?
-
+        params.append(user_id)
         conn.execute(f"UPDATE users SET {set_clause} WHERE user_id = ?", params)
         conn.commit()
 
     conn.close()
-    return jsonify({'status': 'success', 'message': 'Updated personal detail successfully'}), 200
+
+    return jsonify({
+        'status': 'success',
+        'message': 'Updated personal detail successfully',
+        'updated_fields': fields_to_update
+    }), 200
 
 def show_history():
     user_id = request.args.get("user_id")  # lấy từ query param
@@ -111,7 +152,7 @@ def show_history():
         FROM eating_histories
         JOIN recipes ON eating_histories.recipe_id = recipes.recipe_id
         WHERE user_id = ?
-          AND day BETWEEN DATE_SUB(CURDATE(), INTERVAL 4 DAY) AND CURDATE()
+          AND day BETWEEN DATE_SUB(CURDATE(), INTERVAL 4 DAY) AND CURDATE() AND eaten = 1
         GROUP BY day
     """, (user_id,)).fetchall()
     conn.close()

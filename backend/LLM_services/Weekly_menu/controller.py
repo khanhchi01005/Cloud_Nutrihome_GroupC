@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from .services import AI_generate_bonus_meal
-user_bp = Blueprint("user_bp", __name__)
+user_bp = Blueprint("user_bp", __name__, url_prefix='/api/llm-services')
 
 # API tạo thực đơn bổ sung cho user
 @user_bp.route("/generate-bonus-meal", methods=["POST"])

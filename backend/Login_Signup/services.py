@@ -56,7 +56,9 @@ def login_user(username: str, password: str):
             cursor.close()
         if connection:
             connection.close()
-                        
+
+DEFAULT_AVATAR = "https://nutrihome-assets.s3.ap-southeast-1.amazonaws.com/images/users/macdinh.jpg"
+
 def register_user(fullname, username, password, dob, height, weight, activity_level,
                   disease=None, allergen=None, gender=None):
     connection = None
@@ -111,9 +113,9 @@ def register_user(fullname, username, password, dob, height, weight, activity_le
                 activity_level, disease, allergen, gender,
                 target_carbs, target_protein, target_fat, target_calories,
                 eaten_carbs, eaten_protein, eaten_fat, eaten_calories,
-                family_id
+                family_id, avatar
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
 
         # Convert tất cả giá trị số sang float và None → NULL
@@ -137,7 +139,8 @@ def register_user(fullname, username, password, dob, height, weight, activity_le
             0,  # eaten_protein
             0,  # eaten_fat
             0,  # eaten_calories
-            family_id
+            family_id,
+            DEFAULT_AVATAR
         )
 
         cursor.execute(insert_query, params)

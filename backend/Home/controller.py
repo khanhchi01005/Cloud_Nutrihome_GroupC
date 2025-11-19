@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from Home.services import get_user_nutrition, update_user_nutrition, update_user_nutrition_daily, UpdateError
+from Home.services import get_user_nutrition, update_user_nutrition, update_user_nutrition_daily, UpdateError, update_user_nutrition
 
 # Blueprint cho các API nutrition/home
 calorie_bp = Blueprint('calorie', __name__, url_prefix='/api/home')
@@ -52,5 +52,19 @@ def reset_eaten():
     try:
         update_user_nutrition_daily(user_id)
         return jsonify({"status": "success", "message": "Eaten values reset to 0"}), 200
+    except UpdateError as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    
+@calorie_bp.route('/update_calories', methods=['POST'])
+def update_calories():
+    data = request.get_json()
+    if not data or 'user_id' not in data:
+        return jsonify({"status": "error", "message": "Missing user_id"}), 400
+
+    user_id = data['user_id']
+
+    try:
+        update_user_nutrition(user_id)
+        return jsonify({"status": "success", "message": "Eaten values updated"}), 200
     except UpdateError as e:
         return jsonify({"status": "error", "message": str(e)}), 500
